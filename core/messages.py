@@ -1,0 +1,26 @@
+"""Mapeador centralizado de mensajes de feedback (tabla de eventos MITA)."""
+from enum import Enum
+
+
+class MensajeMITA(str, Enum):
+    BIENVENIDA = "Bienvenido a MITA"
+    CAMPOS_OBLIGATORIOS = "Complete los campos obligatorios"
+    CORREO_DUPLICADO = "Este correo ya está registrado"
+    REGISTRO_EXITOSO = "Registro exitoso"
+    ACCESO_CORRECTO = "Acceso correcto"
+    CREDENCIALES_INCORRECTAS = "Usuario o contraseña incorrectos"
+    SESION_CERRADA = "Sesión cerrada correctamente"
+    ACTIVIDADES_ADAPTADAS = "Se muestran actividades adaptadas a tu perfil"
+    SIGUE_PASOS = "Sigue los pasos mostrados"
+    EXCELENTE_TRABAJO = "¡Excelente trabajo!"
+    ACTIVIDAD_COMPLETADA = "Actividad completada exitosamente"
+    LOGRO_DESBLOQUEADO = "Nuevo logro desbloqueado"
+    INFO_FAMILIAR = "Información actualizada correctamente"
+    ESTADISTICAS_CUIDADOR = "Estadísticas actualizadas"
+    BIENVENIDA_COMUNIDAD = "Bienvenido a la comunidad MITA"
+    MENSAJE_ENVIADO = "Mensaje enviado correctamente"
+    SIN_AUTORIZACION = "No tienes autorización para ver este perfil"
+    ERROR_GUARDAR = "Error al guardar el registro"
+    CREDENCIALES_GENERADAS = "Credenciales generadas correctamente"
+    USUARIO_ACTUALIZADO = "Usuario actualizado correctamente"
+    USUARIO_ELIMINADO = "Usuario eliminado correctamente"

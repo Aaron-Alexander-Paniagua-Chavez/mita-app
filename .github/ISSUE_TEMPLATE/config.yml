@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentación de arquitectura
+    url: https://github.com/Aaron-Alexander-Paniagua-Chavez/mita-app/blob/main/docs/ARQUITECTURA_SINCRONIZACION.md
+    about: Cómo se sincronizan los datos entre la base local y la base compartida.
+  - name: Documentación de seguridad
+    url: https://github.com/Aaron-Alexander-Paniagua-Chavez/mita-app/blob/main/docs/SEGURIDAD.md
+    about: Medidas de seguridad implementadas y por qué.

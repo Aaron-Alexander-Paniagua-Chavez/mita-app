@@ -1,0 +1,5 @@
+-- MITA — esquema administrado automáticamente desde Python.
+--
+-- No ejecutes este archivo para iniciar la aplicación. DatabaseManager crea
+-- SistemaGeriatrico, aplica las migraciones y carga los datos de ejemplo al
+-- abrir MITA. La definición versionada se encuentra en database/mysql_schema.py.
