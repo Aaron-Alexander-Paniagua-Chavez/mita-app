@@ -448,7 +448,105 @@ class VistaAdmin(VistaMixin):
             ).pack(side="right", padx=8)
 
         ComponenteUI.boton(frame, "Comprobar conexión MySQL", self._sync, ancho=260).pack(pady=8)
+        ComponenteUI.boton(
+            frame,
+            "🔐 Ver contraseñas (sólo dueño)",
+            self._abrir_boveda_duenno,
+            ancho=320,
+            color=DISABLED_SURFACE,
+        ).pack(pady=4)
         ComponenteUI.boton(frame, "Salir del panel admin", self.app.mostrar_bienvenida, ancho=220, color=TEXT_GRAY).pack(pady=4)
+
+    def _abrir_boveda_duenno(self) -> None:
+        """Pide la clave maestra del dueño y muestra todas las contraseñas."""
+        from core.password_vault import PasswordVault
+
+        if not PasswordVault.disponible():
+            NotificationService.mostrar(
+                self.app.main_container,
+                "MITA_OWNER_KEY no está definida en este entorno. Nadie puede ver las contraseñas.",
+                es_error=True, duracion=8000,
+            )
+            return
+
+        ventana = ctk.CTkToplevel(self.app)
+        ventana.title("Bóveda del dueño")
+        ventana.geometry("520x320")
+        ventana.configure(fg_color=BG_COLOR)
+        ventana.transient(self.app)
+        ventana.grab_set()
+
+        ComponenteUI.titulo(ventana, "🔐 Acceso del dueño").pack(pady=(24, 8))
+        ctk.CTkLabel(
+            ventana,
+            text="Esta ventana muestra TODAS las contraseñas.\nIntroduce tu clave maestra (MITA_OWNER_KEY).",
+            font=ComponenteUI.fuente(15), text_color=TEXT_GRAY, justify="center",
+        ).pack(pady=(0, 12))
+        entry = ComponenteUI.entrada(ventana, "Clave maestra del dueño", password=True)
+        entry.pack(pady=8, padx=40, fill="x")
+        resultado = ctk.CTkLabel(ventana, text="", font=ComponenteUI.fuente(14), justify="left")
+        resultado.pack(pady=8, padx=40, fill="x")
+
+        def intentar():
+            import os
+            clave_intento = entry.get()
+            clave_real = os.getenv("MITA_OWNER_KEY", "")
+            if not clave_real or clave_intento != clave_real:
+                resultado.configure(text="❌ Clave incorrecta.", text_color="#D32F2F")
+                return
+            self._renderizar_credenciales(ventana, resultado)
+
+        ComponenteUI.boton(ventana, "Desbloquear", intentar, ancho=240).pack(pady=6)
+        ComponenteUI.boton(
+            ventana, "Cerrar", ventana.destroy, ancho=160, color=TEXT_GRAY,
+        ).pack(pady=4)
+
+    def _renderizar_credenciales(self, ventana, etiqueta_estado) -> None:
+        from core.password_vault import PasswordVault
+        filas = self.app.admin_service.listar_credenciales_cifradas()
+        if not filas:
+            etiqueta_estado.configure(text="No hay usuarios.", text_color=TEXT_GRAY)
+            return
+        # Limpiamos los widgets previos (los inputs ya están) y mostramos tabla.
+        for w in ventana.winfo_children():
+            if getattr(w, "_es_tabla_credenciales", False):
+                w.destroy()
+        scroll = ctk.CTkScrollableFrame(ventana, fg_color=SURFACE_COLOR, height=200)
+        scroll._es_tabla_credenciales = True  # type: ignore[attr-defined]
+        scroll.pack(fill="both", expand=True, padx=20, pady=(8, 12))
+        for f in filas:
+            plano = PasswordVault.descifrar(f["token"])
+            if plano is None:
+                texto_pwd = "(no disponible / sin clave)"
+            else:
+                # Mostramos asteriscos por defecto; un botón permite revelar.
+                fila = ctk.CTkFrame(scroll, fg_color="transparent")
+                fila.pack(fill="x", pady=2)
+                info = ctk.CTkLabel(
+                    fila,
+                    text=f"[{f['rol']}] {f['nombre']} <{f['correo']}>",
+                    font=ComponenteUI.fuente(14), anchor="w",
+                )
+                info.pack(side="left", padx=8)
+                entry_pwd = ctk.CTkEntry(fila, width=180)
+                entry_pwd.insert(0, "•" * max(6, len(plano)))
+                entry_pwd.configure(state="disabled")
+                entry_pwd.pack(side="left", padx=6)
+                def alternar(_entry=entry_pwd, _plano=plano):
+                    if _entry.cget("state") == "disabled":
+                        _entry.configure(state="normal")
+                        _entry.delete(0, "end")
+                        _entry.insert(0, _plano)
+                    else:
+                        _entry.configure(state="disabled")
+                        _entry.delete(0, "end")
+                        _entry.insert(0, "•" * max(6, len(_plano)))
+                ctk.CTkButton(
+                    fila, text="👁", width=40, command=alternar,
+                ).pack(side="left", padx=4)
+        etiqueta_estado.configure(
+            text=f"{len(filas)} usuarios encontrados.", text_color=ACCENT_GREEN,
+        )
 
     def _editar_rol(self, user_id: int) -> None:
         dialog = ctk.CTkInputDialog(text="Nuevo rol:", title="Modificar rol")

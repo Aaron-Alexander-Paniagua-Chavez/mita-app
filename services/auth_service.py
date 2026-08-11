@@ -36,6 +36,10 @@ class AuthService:
             "nivel_movilidad", "dificultades_cognitivas", "cedula_medica",
             "id_adulto_vinculado", "acepto_privacidad", "creado_por",
         )}
+        # Guardamos también la contraseña original cifrada con la clave del
+        # dueño. Si MITA_OWNER_KEY no existe, simplemente no se almacena.
+        if hash_password and datos.get("password"):
+            extra["password_revealable"] = datos["password"]
 
         if self._repo.guardar_usuario(usuario, extra):
             if datos.get("id_familiar_vincular") and usuario.id:

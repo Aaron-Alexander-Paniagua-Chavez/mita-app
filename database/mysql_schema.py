@@ -7,7 +7,7 @@ referencia humana y nunca es necesario importarlo manualmente.
 from __future__ import annotations
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 MYSQL_TABLE_DDL = (
@@ -23,6 +23,7 @@ MYSQL_TABLE_DDL = (
         nombre VARCHAR(150) NOT NULL,
         correo VARCHAR(254) NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
+        password_revealable VARBINARY(512) NULL,
         rol ENUM('Administrador', 'Adulto Mayor', 'Cuidador', 'Familiar') NOT NULL,
         fecha_registro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uk_usuarios_correo (correo),
@@ -362,6 +363,12 @@ MYSQL_TABLE_DDL = (
         CONSTRAINT fk_reporte_destinatario_usuario FOREIGN KEY (id_usuario)
             REFERENCES usuarios(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    # v3: columna para que solo el dueño (con clave maestra) pueda descifrar y ver
+    # la contraseña original de cada usuario. Se conserva el hash PBKDF2 para
+    # que el inicio de sesión normal no dependa nunca del dueño.
+    """
+    ALTER TABLE usuarios ADD COLUMN password_revealable VARBINARY(512) NULL
     """,
 )
 
