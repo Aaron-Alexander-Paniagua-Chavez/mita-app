@@ -33,20 +33,12 @@ class AdministradorUsuarios:
 
     def modificar_usuario(self, user_id: int, campos: dict, id_admin: int) -> str:
         if "password" in campos and campos["password"]:
-            from core.password_vault import PasswordVault
             plain = campos["password"]
-            campos["contraseña"] = GestorSeguridad.hashear_password(plain)
-            token = PasswordVault.cifrar(plain)
-            if token is not None:
-                campos["password_revealable"] = token
+            campos["password_hash"] = GestorSeguridad.hashear_password(plain)
         if self._repo.actualizar_usuario(user_id, campos):
             self._log("MODIFICAR_USUARIO", f"ID: {user_id}", id_admin)
             return MensajeMITA.USUARIO_ACTUALIZADO.value
         return MensajeMITA.ERROR_GUARDAR.value
-
-    def listar_credenciales_cifradas(self) -> list[dict]:
-        """Devuelve id/nombre/correo y el token cifrado. Sólo descifra el dueño."""
-        return self._repo.listar_credenciales_cifradas()
 
     def eliminar_usuario(self, user_id: int, id_admin: int) -> str:
         if self._repo.eliminar_usuario(user_id):

@@ -216,6 +216,19 @@ class MitaApp(ctk.CTk):
         for warning in self.db_service.startup_warnings:
             NotificationService.mostrar(right, warning, duracion=6500)
 
+        if not self.db_service.mysql_ready:
+            ctk.CTkLabel(
+                right,
+                text="La base MySQL requiere configuración inicial.",
+                font=ComponenteUI.fuente(15), text_color="#D32F2F",
+            ).pack(pady=(4, 8))
+            ComponenteUI.boton(
+                right,
+                "Configurar MySQL",
+                self._mostrar_configuracion_mysql,
+                ancho=280,
+            ).pack(pady=(0, 14))
+
         ComponenteUI.titulo(right, "¿Quién eres?").pack(pady=(10, 20))
 
         ComponenteUI.boton(
@@ -248,6 +261,67 @@ class MitaApp(ctk.CTk):
             font=ComponenteUI.fuente(12),
             text_color=TEXT_GRAY,
         ).pack(side="bottom", pady=8)
+
+    def _mostrar_configuracion_mysql(self) -> None:
+        ventana = ctk.CTkToplevel(self)
+        ventana.title("Configurar MySQL")
+        ventana.geometry("480x610")
+        ventana.configure(fg_color=BG_COLOR)
+        ventana.transient(self)
+        ventana.grab_set()
+
+        ComponenteUI.titulo(ventana, "Conexión MySQL").pack(pady=(24, 6))
+        ctk.CTkLabel(
+            ventana,
+            text="Estos datos se guardan sólo en esta computadora. No necesitas editar .env.",
+            font=ComponenteUI.fuente(14), text_color=TEXT_GRAY, wraplength=400,
+            justify="center",
+        ).pack(padx=24, pady=(0, 16))
+
+        valores = self.db_service.mysql_config
+        campos = (
+            ("Servidor", "host", valores.get("host", "localhost"), False),
+            ("Puerto", "port", str(valores.get("port", 3306)), False),
+            ("Base de datos", "database", valores.get("database", "mita_local"), False),
+            ("Usuario de la aplicación", "user", valores.get("user", "root"), False),
+            ("Contraseña de la aplicación", "password", "", True),
+            ("Usuario administrador", "admin_user", valores.get("user", "root"), False),
+            ("Contraseña administrador", "admin_password", "", True),
+        )
+        entradas = {}
+        for etiqueta, clave, valor, es_password in campos:
+            ctk.CTkLabel(ventana, text=etiqueta, font=ComponenteUI.fuente(14)).pack(
+                anchor="w", padx=40, pady=(5, 0)
+            )
+            entrada = ComponenteUI.entrada(ventana, etiqueta, password=es_password)
+            entrada.pack(fill="x", padx=40, pady=(2, 4))
+            if valor:
+                entrada.insert(0, str(valor))
+            entradas[clave] = entrada
+
+        estado = ctk.CTkLabel(ventana, text="", font=ComponenteUI.fuente(14), wraplength=400)
+        estado.pack(padx=30, pady=(8, 4))
+
+        def guardar() -> None:
+            ok, mensaje = self.db_service.configurar_mysql(
+                host=entradas["host"].get(),
+                port=entradas["port"].get(),
+                database=entradas["database"].get(),
+                user=entradas["user"].get(),
+                password=entradas["password"].get(),
+                admin_user=entradas["admin_user"].get(),
+                admin_password=entradas["admin_password"].get(),
+            )
+            if not ok:
+                estado.configure(text=mensaje, text_color="#D32F2F")
+                return
+            ventana.destroy()
+            self.mostrar_bienvenida(mensaje)
+
+        ComponenteUI.boton(ventana, "Probar y guardar", guardar, ancho=260).pack(pady=(8, 4))
+        ComponenteUI.boton(
+            ventana, "Cancelar", ventana.destroy, ancho=180, color=TEXT_GRAY,
+        ).pack(pady=(0, 14))
 
     # ------------------------------------------------------------------
     # LOGIN POR ROL

@@ -54,18 +54,10 @@ class UsuarioRepository:
         try:
             cursor = conn.cursor()
             conn.start_transaction()
-            # Si el llamador pasó una contraseña en claro, la ciframos para el
-            # "modo dueño" antes de insertar. El hash PBKDF2 sigue siendo el
-            # mecanismo de login.
-            token_reveal = None
-            reveal_plain = datos_extra.get("password_revealable")
-            if reveal_plain:
-                from core.password_vault import PasswordVault
-                token_reveal = PasswordVault.cifrar(reveal_plain)
             cursor.execute(
-                """INSERT INTO usuarios (nombre, correo, password_hash, password_revealable, rol)
-                   VALUES (%s, %s, %s, %s, %s)""",
-                (usuario.nombre, usuario.correo, usuario.password_hash, token_reveal, usuario.rol),
+                """INSERT INTO usuarios (nombre, correo, password_hash, rol)
+                   VALUES (%s, %s, %s, %s)""",
+                (usuario.nombre, usuario.correo, usuario.password_hash, usuario.rol),
             )
             usuario.id = cursor.lastrowid
             if usuario.rol == "Adulto Mayor":
@@ -150,12 +142,10 @@ class UsuarioRepository:
     def actualizar_usuario(self, user_id: int, campos: dict) -> bool:
         if not campos:
             return False
-        permitidos_usuario = {"nombre", "correo", "rol", "password_hash", "password_revealable"}
+        permitidos_usuario = {"nombre", "correo", "rol", "password_hash"}
         permitidos_adulto = {"limitaciones_movilidad", "perfil_medico", "imc", "nivel_movilidad"}
         user_fields = {k: v for k, v in campos.items() if k in permitidos_usuario}
         adult_fields = {k: v for k, v in campos.items() if k in permitidos_adulto}
-        if "contraseña" in campos:
-            user_fields["password_hash"] = campos["contraseña"]
         if not user_fields and not adult_fields:
             return False
         conn = self._db.obtener_conexion_mysql()
@@ -184,24 +174,6 @@ class UsuarioRepository:
 
     def eliminar_usuario(self, user_id: int) -> bool:
         return self._db.ejecutar_mysql("DELETE FROM usuarios WHERE id = %s", (user_id,)) is not None
-
-    def listar_credenciales_cifradas(self) -> list[dict]:
-        """Devuelve el token cifrado de cada usuario. Descifrar requiere la
-        clave maestra del dueño (MITA_OWNER_KEY)."""
-        rows = self._db.ejecutar_mysql(
-            "SELECT id, nombre, correo, rol, password_revealable FROM usuarios ORDER BY rol, nombre"
-        ) or []
-        return [
-            {
-                "id": r["id"],
-                "nombre": r["nombre"],
-                "correo": r["correo"],
-                "rol": r["rol"],
-                "token": r["password_revealable"],
-                "tiene_cifrado": r["password_revealable"] is not None,
-            }
-            for r in rows
-        ]
 
     def vincular_familiar(self, id_familiar: int, id_adulto: int) -> bool:
         result = self._db.ejecutar_mysql(
