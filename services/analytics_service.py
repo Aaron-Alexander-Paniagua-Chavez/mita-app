@@ -14,9 +14,13 @@ class AnalyticsService:
         self._repository.registrar_evento("login", usuario_id)
         return self._repository.iniciar_sesion(usuario_id, version_app="MITA 2.0")
 
-    def registrar_logout(self, usuario_id: Optional[int], session_id: Any) -> None:
-        self._repository.registrar_evento("logout", usuario_id)
-        self._repository.cerrar_sesion(session_id)
+    def registrar_logout(
+        self, usuario_id: Optional[int], session_id: Any, duracion_segundos: int = 0
+    ) -> None:
+        self._repository.registrar_evento(
+            "logout", usuario_id, duracion_segundos=max(0, duracion_segundos)
+        )
+        self._repository.cerrar_sesion(session_id, duracion_segundos)
 
     def registrar_cambio_pantalla(self, usuario_id: Optional[int], pantalla: str) -> None:
         self._repository.registrar_evento("cambio_pantalla", usuario_id, pantalla=pantalla)

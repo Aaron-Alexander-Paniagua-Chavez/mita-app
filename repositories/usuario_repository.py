@@ -111,12 +111,15 @@ class UsuarioRepository:
                 (adulto_id,),
             )
 
-    def autenticar(self, correo_o_nombre: str, password_raw: str) -> Optional[dict]:
+    def buscar_por_identificador(self, correo_o_nombre: str) -> Optional[dict]:
         rows = self._db.ejecutar_mysql(
             self._SELECT_USUARIO + " WHERE u.correo = %s OR u.nombre = %s",
             (correo_o_nombre, correo_o_nombre),
         )
-        row = rows[0] if rows else None
+        return rows[0] if rows else None
+
+    def autenticar(self, correo_o_nombre: str, password_raw: str) -> Optional[dict]:
+        row = self.buscar_por_identificador(correo_o_nombre)
         if not row or not GestorSeguridad.verificar_password(password_raw, row["password_hash"]):
             return None
         if GestorSeguridad.requiere_actualizacion_hash(row["password_hash"]):

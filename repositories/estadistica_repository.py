@@ -34,7 +34,7 @@ class EstadisticaRepository:
         except Exception:
             return None
 
-    def cerrar_sesion(self, session_id: Any) -> bool:
+    def cerrar_sesion(self, session_id: Any, duracion_segundos: int = 0) -> bool:
         if session_id is None:
             return False
         collection = self._db.obtener_coleccion_mongo("sesiones")
@@ -43,7 +43,10 @@ class EstadisticaRepository:
         try:
             result = collection.update_one(
                 {"_id": session_id},
-                {"$set": {"fin": datetime.now(timezone.utc)}},
+                {"$set": {
+                    "fin": datetime.now(timezone.utc),
+                    "duracion_segundos": max(0, int(duracion_segundos)),
+                }},
             )
             return result.modified_count == 1
         except Exception:

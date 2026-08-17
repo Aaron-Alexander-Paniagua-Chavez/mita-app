@@ -19,7 +19,7 @@ from core.session import SessionManager
 from models.actividad import Actividad, AdaptadorEjercicios
 from models.progreso import GestorProgreso, PanelCuidador, ReporteCuidador, SistemaLogros
 from models.usuario import AdultoMayor
-from ui.components import ComponenteUI, LogoMITA, NotificationService
+from ui.components import ComponenteUI, GuiaVisual, LogoMITA, NotificationService
 
 
 class VistaMixin:
@@ -43,10 +43,10 @@ class VistaMixin:
         nav.pack(fill="x", padx=32, side="bottom", pady=16)
         nav.pack_propagate(False)
         items = [
-            ("Inicio", "🏠", "inicio"),
-            ("Progreso", "📊", "progreso"),
-            ("Comunidad", "👥", "comunidad"),
-            ("Logros", "⭐", "logros"),
+            ("Inicio", "⌂", "inicio"),
+            ("Progreso", "◔", "progreso"),
+            ("Comunidad", "☏", "comunidad"),
+            ("Logros", "★", "logros"),
         ]
         for texto, icono, key in items:
             active = activo == key
@@ -84,6 +84,18 @@ class VistaAdultoMayor(VistaMixin):
         if feedback:
             NotificationService.mostrar(self.app.main_container, feedback)
 
+        motivacion = self.app.personalization_service.mensaje_motivacion(
+            self.app.preferencias_usuario,
+            self.app.gestor_progreso.puntos,
+            self.app.gestor_progreso.racha_dias,
+        )
+        tarjeta_motivacion = ctk.CTkFrame(self.app.main_container, fg_color=SURFACE_COLOR, corner_radius=14)
+        tarjeta_motivacion.pack(fill="x", padx=36, pady=(0, 6))
+        ctk.CTkLabel(
+            tarjeta_motivacion, text=f"✦ {motivacion}", font=ComponenteUI.fuente(16, bold=True),
+            text_color=ACCENT_GREEN, wraplength=760, justify="left",
+        ).pack(anchor="w", padx=18, pady=12)
+
         cards = ctk.CTkFrame(self.app.main_container, fg_color=BG_COLOR)
         cards.pack(fill="x", padx=36, pady=8)
 
@@ -108,11 +120,11 @@ class VistaAdultoMayor(VistaMixin):
         ComponenteUI.subtitulo(acc_frame, "Accesibilidad:").pack(side="left", padx=16, pady=12)
         self.app.font_scale = getattr(self.app, "font_scale", 1.0)
         ctk.CTkButton(
-            acc_frame, text="A+ Texto", width=100, command=lambda: self.app.ajustar_texto(1.1),
+            acc_frame, text="A+ Texto", width=100, command=lambda: self.app.ajustar_texto(1),
             fg_color=ACCENT_GREEN,
         ).pack(side="left", padx=4)
         ctk.CTkButton(
-            acc_frame, text="A- Texto", width=100, command=lambda: self.app.ajustar_texto(0.9),
+            acc_frame, text="A- Texto", width=100, command=lambda: self.app.ajustar_texto(-1),
             fg_color=ACCENT_GREEN,
         ).pack(side="left", padx=4)
 
@@ -145,11 +157,13 @@ class VistaAdultoMayor(VistaMixin):
         NotificationService.mostrar(frame, msj)
         ComponenteUI.titulo(frame, "Ejercicios físicos").pack(anchor="w", pady=(0, 12))
 
+        scroll = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
         for ej in actividades:
-            card = ctk.CTkFrame(frame, fg_color=SURFACE_COLOR, corner_radius=10)
+            card = ctk.CTkFrame(scroll, fg_color=SURFACE_COLOR, corner_radius=10)
             card.pack(fill="x", pady=6)
             ctk.CTkLabel(
-                card, text=f"🏃 {ej.titulo} [{ej.impacto}]",
+                card, text=f"◉ {ej.titulo} · {ej.duracion_sugerida_min} min · {ej.impacto}",
                 font=ComponenteUI.fuente(18), text_color=DARK_TEXT,
             ).pack(side="left", padx=16, pady=14)
             ComponenteUI.boton(
@@ -162,13 +176,19 @@ class VistaAdultoMayor(VistaMixin):
         frame = ctk.CTkFrame(self.app.main_container, fg_color=BG_COLOR)
         frame.pack(fill="both", expand=True, padx=36, pady=24)
         self.boton_volver(frame, self.dashboard)
-        ComponenteUI.titulo(frame, "Actividades cognitivas").pack(anchor="w", pady=(0, 12))
+        ComponenteUI.titulo(frame, "Actividades cognitivas").pack(anchor="w", pady=(0, 4))
+        usuario = SessionManager().usuario_actual
+        dificultades = usuario.dificultades_cognitivas if isinstance(usuario, AdultoMayor) else "Ninguna"
+        actividades, mensaje = AdaptadorEjercicios.filtrar_cognitivos(dificultades)
+        NotificationService.mostrar(frame, mensaje)
 
-        for ej in AdaptadorEjercicios.cognitivos():
-            card = ctk.CTkFrame(frame, fg_color=SURFACE_COLOR, corner_radius=10)
+        scroll = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
+        for ej in actividades:
+            card = ctk.CTkFrame(scroll, fg_color=SURFACE_COLOR, corner_radius=10)
             card.pack(fill="x", pady=6)
             ctk.CTkLabel(
-                card, text=f"🧠 {ej.titulo}",
+                card, text=f"◈ {ej.titulo} · {ej.duracion_sugerida_min} min",
                 font=ComponenteUI.fuente(18), text_color=DARK_TEXT,
             ).pack(side="left", padx=16, pady=14)
             ComponenteUI.boton(
@@ -185,23 +205,43 @@ class VistaAdultoMayor(VistaMixin):
         NotificationService.mostrar(frame, MensajeMITA.SIGUE_PASOS.value)
 
         ComponenteUI.titulo(frame, actividad.titulo).pack(pady=(0, 12))
-        box = ctk.CTkFrame(frame, fg_color=SURFACE_COLOR, corner_radius=14)
+        box = ctk.CTkScrollableFrame(frame, fg_color=SURFACE_COLOR, corner_radius=14)
         box.pack(fill="both", expand=True, pady=8)
 
         for paso in actividad.instrucciones:
             row = ctk.CTkFrame(box, fg_color="transparent")
             row.pack(fill="x", padx=24, pady=8)
-            ctk.CTkLabel(row, text=paso.icono, font=ComponenteUI.fuente(24)).pack(side="left", padx=(0, 12))
+            if self.app.preferencias_usuario.get("estilo_instrucciones", "ilustrado") == "ilustrado":
+                GuiaVisual(
+                    row, paso.movimiento,
+                    animar=bool(self.app.preferencias_usuario.get("animaciones_suaves", True)),
+                ).pack(side="left", padx=(0, 12))
+            else:
+                ctk.CTkLabel(row, text=paso.icono, font=ComponenteUI.fuente(28)).pack(side="left", padx=(0, 12))
             ctk.CTkLabel(
                 row, text=f"{paso.orden}. {paso.texto}",
                 font=ComponenteUI.fuente(18), justify="left", wraplength=620,
             ).pack(side="left", fill="x")
 
-        ComponenteUI.boton(
-            frame, "▶ COMENZAR ACTIVIDAD",
-            lambda: self._completar(actividad),
-            grande=True, ancho=400,
-        ).pack(pady=16)
+        en_curso = self.app.time_tracking_service.actividad_actual()
+        if en_curso and en_curso.titulo == actividad.titulo:
+            ComponenteUI.boton(
+                frame, "✓ TERMINAR Y GUARDAR", lambda: self._completar(actividad),
+                grande=True, ancho=400,
+            ).pack(pady=16)
+        else:
+            ComponenteUI.boton(
+                frame, "▶ COMENZAR ACTIVIDAD", lambda: self._iniciar_actividad(actividad),
+                grande=True, ancho=400,
+            ).pack(pady=16)
+
+    def _iniciar_actividad(self, actividad: Actividad) -> None:
+        self.app.time_tracking_service.iniciar_actividad(actividad.titulo, actividad.categoria)
+        NotificationService.mostrar(
+            self.app.main_container,
+            f"Actividad iniciada. Duración sugerida: {actividad.duracion_sugerida_min} minutos.",
+        )
+        self.instrucciones(actividad)
 
     def _completar(self, actividad: Actividad) -> None:
         def tarea():
@@ -210,10 +250,14 @@ class VistaAdultoMayor(VistaMixin):
             actividad.finalizar()
             pts, msj = self.app.gestor_progreso.registrar_actividad(actividad)
             usuario = SessionManager().usuario_actual
+            duracion = self.app.time_tracking_service.finalizar_actividad(actividad.titulo)
             if usuario and usuario.id:
                 self.app.progreso_repo.guardar_progreso(usuario.id, self.app.gestor_progreso.to_dict())
                 self.app.progreso_repo.registrar_historial(
                     usuario.id, actividad.categoria, actividad.titulo, actividad.calcular_puntuacion(),
+                )
+                self.app.registro_uso_repo.registrar_actividad(
+                    usuario.id, actividad.titulo, actividad.categoria, duracion,
                 )
                 self.app.analytics_service.registrar_resultado_actividad(
                     usuario.id,
@@ -224,7 +268,7 @@ class VistaAdultoMayor(VistaMixin):
                     errores=0,
                     nivel=getattr(actividad, "nivel_dificultad", 1),
                     puntaje=actividad.calcular_puntuacion(),
-                    duracion=0,
+                    duracion=duracion,
                 )
             desbloqueado, msj_logro = self.app.sistema_logros.evaluar(self.app.gestor_progreso)
             self.app.after(0, lambda: self._post_completar(msj, desbloqueado, msj_logro))

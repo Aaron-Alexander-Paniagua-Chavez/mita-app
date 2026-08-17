@@ -1,5 +1,6 @@
 """Componentes UI accesibles — Material Design adaptado (RNF01–RNF03)."""
 import os
+import tkinter as tk
 from io import BytesIO
 from typing import Callable, Optional
 
@@ -30,6 +31,20 @@ from ui.i18n import traducir
 class ComponenteUI:
     """Clase base que garantiza lineamientos de accesibilidad."""
 
+    _acento = ACCENT_GREEN
+    _acento_hover = ACCENT_GREEN_LIGHT
+
+    @classmethod
+    def establecer_tema(cls, tema: str) -> None:
+        """Acentos adicionales conservando los modos claro/oscuro de MITA."""
+        temas = {
+            "clasico": (ACCENT_GREEN, ACCENT_GREEN_LIGHT),
+            "oceano": (("#226A8A", "#68BDE0"), ("#18526B", "#4A9ABF")),
+            "lavanda": (("#715A9C", "#B8A4D8"), ("#594779", "#927AB8")),
+            "calido": (("#A85A3B", "#E09B7A"), ("#80432B", "#BF7659")),
+        }
+        cls._acento, cls._acento_hover = temas.get(tema, temas["clasico"])
+
     @staticmethod
     def fuente(tamano: int, bold: bool = False) -> ctk.CTkFont:
         return ctk.CTkFont(family=FONT_FAMILY, size=max(tamano, 16), weight="bold" if bold else "normal")
@@ -51,8 +66,8 @@ class ComponenteUI:
             command=command,
             width=ancho or 320,
             height=h,
-            fg_color=color or ACCENT_GREEN,
-            hover_color=ACCENT_GREEN_LIGHT,
+            fg_color=color or ComponenteUI._acento,
+            hover_color=ComponenteUI._acento_hover,
             corner_radius=12,
             font=ComponenteUI.fuente(FONT_SIZE_BUTTON, bold=True),
             text_color=WHITE,
@@ -142,12 +157,54 @@ class LogoMITA(ctk.CTkFrame):
                 font=ctk.CTkFont(family=FONT_FAMILY, size=max(22, size // 2), weight="bold"),
                 text_color=ACCENT_TERRACOTA,
             ).pack()
-            ctk.CTkLabel(
-                self,
-                text="MITA",
-                font=ctk.CTkFont(family=FONT_FAMILY, size=max(14, size // 5), weight="bold"),
-                text_color=ACCENT_GREEN_LIGHT,
-            ).pack()
+
+
+class GuiaVisual(ctk.CTkFrame):
+    """Dibujo sencillo y animado para acompañar instrucciones sin depender de red."""
+
+    def __init__(self, parent, movimiento: str = "general", animar: bool = True, **kwargs) -> None:
+        super().__init__(parent, fg_color=SOFT_GREEN, corner_radius=14, **kwargs)
+        self.movimiento = movimiento
+        self._fase = 0
+        self._animar = animar
+        self.canvas = tk.Canvas(self, width=150, height=120, bg="#E8F0E8", highlightthickness=0)
+        self.canvas.pack(padx=10, pady=8)
+        self._dibujar()
+        if animar:
+            self.after(700, self._pulso)
+
+    def _dibujar(self) -> None:
+        c = self.canvas
+        c.delete("all")
+        verde, terracota = "#21574A", "#D39B75"
+        y = 31 + (2 if self._fase else 0)
+        # Cabeza, cuerpo, brazos y piernas: una silueta universal, legible y sin estereotipos.
+        c.create_oval(66, y - 18, 84, y, fill=terracota, outline=verde, width=2)
+        c.create_line(75, y, 75, y + 45, fill=verde, width=5, capstyle="round")
+        if self.movimiento in {"brazos", "hombros", "movimiento"}:
+            brazos = (43, y + 10, 106, y + 2) if self._fase else (48, y + 18, 102, y + 18)
+        elif self.movimiento in {"respiracion", "sentado"}:
+            brazos = (55, y + 21, 95, y + 21)
+        else:
+            brazos = (51, y + 15, 99, y + 15)
+        c.create_line(75, y + 12, brazos[0], brazos[1], fill=verde, width=5, capstyle="round")
+        c.create_line(75, y + 12, brazos[2], brazos[3], fill=verde, width=5, capstyle="round")
+        if self.movimiento in {"piernas", "rodillas", "caminar", "equilibrio"}:
+            c.create_line(75, y + 45, 55, y + 72 + (3 if self._fase else 0), fill=verde, width=5, capstyle="round")
+            c.create_line(75, y + 45, 98, y + 70 - (3 if self._fase else 0), fill=verde, width=5, capstyle="round")
+        else:
+            c.create_line(75, y + 45, 61, y + 74, fill=verde, width=5, capstyle="round")
+            c.create_line(75, y + 45, 89, y + 74, fill=verde, width=5, capstyle="round")
+        if self.movimiento == "respiracion":
+            c.create_arc(105, y + 15, 137, y + 47, start=80, extent=200, style="arc", outline=terracota, width=3)
+        c.create_text(75, 106, text="Guía ilustrada", fill="#21574A", font=(FONT_FAMILY, 11, "bold"))
+
+    def _pulso(self) -> None:
+        if not self.winfo_exists():
+            return
+        self._fase = 1 - self._fase
+        self._dibujar()
+        self.after(700, self._pulso)
 
 
 class NotificationService:

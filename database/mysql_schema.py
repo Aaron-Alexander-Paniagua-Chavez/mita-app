@@ -246,14 +246,76 @@ MYSQL_TABLE_DDL = (
             REFERENCES usuarios(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
+    """
+    CREATE TABLE IF NOT EXISTS preferencias_usuario (
+        id_usuario INT PRIMARY KEY,
+        preferencias JSON NOT NULL,
+        actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_preferencias_usuario FOREIGN KEY (id_usuario)
+            REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS sesiones_uso (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        id_usuario INT NOT NULL,
+        inicio DATETIME NOT NULL,
+        fin DATETIME NOT NULL,
+        duracion_segundos INT UNSIGNED NOT NULL DEFAULT 0,
+        KEY idx_sesiones_uso_usuario_inicio (id_usuario, inicio),
+        CONSTRAINT fk_sesiones_uso_usuario FOREIGN KEY (id_usuario)
+            REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS tiempos_actividad (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        id_usuario INT NOT NULL,
+        titulo VARCHAR(200) NOT NULL,
+        categoria VARCHAR(50) NOT NULL,
+        duracion_segundos INT UNSIGNED NOT NULL DEFAULT 0,
+        fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_tiempos_actividad_usuario_fecha (id_usuario, fecha_hora),
+        CONSTRAINT fk_tiempos_actividad_usuario FOREIGN KEY (id_usuario)
+            REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
 )
 
 
 CATALOGO_ACTIVIDADES = (
     ("Estiramiento de brazos", "Rutina física de bajo impacto.", "fisico", 1, "Bajo"),
     ("Caminata ligera guiada", "Caminata adaptada de cinco minutos.", "fisico", 1, "Bajo"),
+    ("Respiración consciente", "Respiración suave sentado.", "fisico", 1, "Bajo"),
+    ("Movilidad de hombros", "Movimientos lentos de hombros.", "fisico", 1, "Bajo"),
+    ("Manos activas", "Apertura y cierre de manos sentado.", "fisico", 1, "Bajo"),
+    ("Estiramiento de cuello", "Movilidad cervical suave.", "fisico", 1, "Bajo"),
+    ("Postura sentada", "Alineación y respiración en silla.", "fisico", 1, "Bajo"),
+    ("Baile sentado", "Ritmo suave desde una silla.", "fisico", 2, "Bajo"),
+    ("Elevación de talones", "Fortalecimiento de tobillos con apoyo.", "fisico", 2, "Bajo"),
+    ("Paso lateral con apoyo", "Desplazamiento corto junto a una silla.", "fisico", 2, "Medio"),
+    ("Equilibrio con respaldo", "Equilibrio de pie con silla estable.", "fisico", 2, "Medio"),
+    ("Sentarse y levantarse", "Movimiento funcional con silla estable.", "fisico", 3, "Medio"),
+    ("Caminata por intervalos", "Paseo con descansos programados.", "fisico", 3, "Medio"),
+    ("Estiramiento de pantorrilla", "Estiramiento leve con apoyo.", "fisico", 2, "Bajo"),
+    ("Movilidad de tobillos", "Círculos suaves de tobillos sentado.", "fisico", 1, "Bajo"),
+    ("Tai chi básico", "Secuencia lenta de brazos y postura.", "fisico", 2, "Bajo"),
     ("Juego de memoria", "Actividad de asociación de cartas.", "cognitivo", 1, "Bajo"),
     ("Secuencias numéricas", "Estimulación de atención y memoria.", "cognitivo", 3, "Bajo"),
+    ("Buscar diferencias", "Atención visual entre dos escenas.", "cognitivo", 1, "Bajo"),
+    ("Palabras por categoría", "Lenguaje y asociación de ideas.", "cognitivo", 1, "Bajo"),
+    ("Sopa de letras suave", "Búsqueda visual sin límite de tiempo.", "cognitivo", 2, "Bajo"),
+    ("Rompecabezas de figuras", "Organización visual paso a paso.", "cognitivo", 2, "Bajo"),
+    ("Cálculo cotidiano", "Operaciones sencillas de la vida diaria.", "cognitivo", 2, "Bajo"),
+    ("Ordenar una historia", "Secuenciar imágenes o frases.", "cognitivo", 2, "Bajo"),
+    ("Atención a sonidos", "Reconocer patrones de sonidos cotidianos.", "cognitivo", 1, "Bajo"),
+    ("Orientación del día", "Práctica de fecha, clima y rutina.", "cognitivo", 1, "Bajo"),
+    ("Reconocer emociones", "Identificar emociones en expresiones.", "cognitivo", 1, "Bajo"),
+    ("Nombres y lugares", "Evocar categorías familiares con apoyo.", "cognitivo", 2, "Bajo"),
+    ("Patrones de colores", "Completar patrones visuales suaves.", "cognitivo", 2, "Bajo"),
+    ("Lectura acompañada", "Comprensión de un texto breve.", "cognitivo", 1, "Bajo"),
+    ("Planificar una receta", "Secuencia práctica de pasos cotidianos.", "cognitivo", 2, "Bajo"),
 )
 
 CATALOGO_ALERGIAS = (

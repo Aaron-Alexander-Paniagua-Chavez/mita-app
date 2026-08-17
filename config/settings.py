@@ -15,6 +15,31 @@ APP_ROOT = Path(__file__).resolve().parents[1]
 
 APP_DATA_ROOT = Path(os.getenv("LOCALAPPDATA") or Path.home()) / "MITA"
 DATABASE_SETTINGS_PATH = APP_DATA_ROOT / "database.json"
+SESSION_SETTINGS_PATH = APP_DATA_ROOT / "session.json"
+
+
+def _cargar_archivo_env() -> None:
+    """Carga ``.env`` local sin sobrescribir variables ya definidas.
+
+    La aplicación se puede distribuir sin este archivo. Mantener la lectura
+    aquí hace que el ``.env`` existente sí sea útil, sin exigir que se suba al
+    repositorio ni añadir una dependencia para ello.
+    """
+    ruta = APP_ROOT / ".env"
+    try:
+        for linea in ruta.read_text(encoding="utf-8").splitlines():
+            linea = linea.strip()
+            if not linea or linea.startswith("#") or "=" not in linea:
+                continue
+            nombre, valor = linea.split("=", 1)
+            nombre = nombre.strip()
+            if nombre and nombre not in os.environ:
+                os.environ[nombre] = valor.strip().strip('"').strip("'")
+    except OSError:
+        pass
+
+
+_cargar_archivo_env()
 
 
 def _leer_configuracion_local() -> dict[str, Any]:
@@ -77,7 +102,9 @@ ERROR_COLOR = ("#D32F2F", "#FF8983")
 WHITE = ("#FFFFFF", "#F4F8F5")
 
 # Accesibilidad (RNF01–RNF03): mínimo 16px, alto contraste
-FONT_FAMILY = "Segoe UI"
+# Inter es la tipografía de producto. Windows la usa si está instalada; si no,
+# Tk aplica su fallback de sistema sin impedir el arranque.
+FONT_FAMILY = "Inter"
 FONT_SIZE_BODY = 16
 FONT_SIZE_BUTTON = 18
 FONT_SIZE_SUBTITLE = 24
@@ -105,8 +132,18 @@ MYSQL_PASSWORD = _valor_configuracion("MYSQL_PASSWORD", "")
 MYSQL_ADMIN_USER = _valor_configuracion("MYSQL_ADMIN_USER", MYSQL_USER)
 MYSQL_ADMIN_PASSWORD = _valor_configuracion("MYSQL_ADMIN_PASSWORD", MYSQL_PASSWORD)
 
-MONGO_URI = "mongodb://127.0.0.1:27017"
-MONGO_DATABASE = "mita_analytics"
+MONGO_URI = _valor_configuracion("MONGO_URI", "mongodb://127.0.0.1:27017")
+MONGO_DATABASE = _valor_configuracion("MONGO_DATABASE", "mita_analytics")
+
+# Funciones remotas opcionales. Nunca se escriben claves en el código ni se
+# mandan datos clínicos a estas integraciones.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+MQTT_HOST = os.getenv("MQTT_HOST", "").strip()
+MQTT_PORT = _int_env("MQTT_PORT", 8883)
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "").strip()
+MQTT_TLS = os.getenv("MQTT_TLS", "1").strip().lower() not in {"0", "false", "no"}
+MITA_DEMO_PASSWORD = os.getenv("MITA_DEMO_PASSWORD", "")
 
 MYSQL_CONFIG = {
     "host": MYSQL_HOST,

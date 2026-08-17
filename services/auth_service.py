@@ -54,9 +54,15 @@ class AuthService:
         if not correo_o_nombre or not password_raw:
             return False, MensajeMITA.CAMPOS_OBLIGATORIOS.value, None
 
-        row = self._repo.autenticar(correo_o_nombre, password_raw)
+        row = self._repo.buscar_por_identificador(correo_o_nombre)
         if not row:
-            return False, MensajeMITA.CREDENCIALES_INCORRECTAS.value, None
+            return False, MensajeMITA.USUARIO_NO_ENCONTRADO.value, None
+        if not GestorSeguridad.verificar_password(password_raw, row["password_hash"]):
+            return False, MensajeMITA.CONTRASENA_INCORRECTA.value, None
+        if GestorSeguridad.requiere_actualizacion_hash(row["password_hash"]):
+            nuevo_hash = GestorSeguridad.hashear_password(password_raw)
+            self._repo.actualizar_usuario(row["id"], {"password_hash": nuevo_hash})
+            row["password_hash"] = nuevo_hash
 
         usuario = UsuarioFactory.crear_usuario(row)
 
@@ -70,7 +76,7 @@ class AuthService:
             if isinstance(permitidos, str):
                 permitidos = (permitidos,)
             if usuario.rol not in permitidos and usuario.rol != "Administrador":
-                return False, MensajeMITA.CREDENCIALES_INCORRECTAS.value, None
+                return False, MensajeMITA.ROL_INCORRECTO.value, None
 
         SessionManager().usuario_actual = usuario
         return True, MensajeMITA.ACCESO_CORRECTO.value, usuario

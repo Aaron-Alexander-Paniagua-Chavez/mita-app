@@ -1,4 +1,5 @@
-"""Aplicación principal MITA — CustomTkinter con roles y accesibilidad."""
+"""Aplicación principal MITA — roles, accesibilidad y modo híbrido."""
+from datetime import datetime
 import tkinter as tk
 
 import customtkinter as ctk
@@ -9,12 +10,14 @@ from config.settings import (
     BG_COLOR,
     BG_WARM,
     DARK_TEXT,
+    ERROR_COLOR,
     FONT_SIZE_HERO,
     SOFT_GREEN,
     SURFACE_COLOR,
     TEXT_GRAY,
 )
 from core.database import DatabaseManager
+from core.connectivity import comprobar_red
 from core.messages import MensajeMITA
 from core.session import SessionManager
 from core.sync import GestorSincronizacionLocal
@@ -22,11 +25,15 @@ from models.progreso import GestorProgreso, SistemaLogros
 from repositories.comunidad_repository import ComunidadRepository
 from repositories.estadistica_repository import EstadisticaRepository
 from repositories.progreso_repository import ProgresoRepository
+from repositories.preferencias_repository import PreferenciasRepository
+from repositories.registro_uso_repository import RegistroUsoRepository
 from repositories.usuario_repository import UsuarioRepository
 from services.admin_service import AdministradorUsuarios
 from services.auth_service import AuthService
 from services.comunidad_service import ComunidadService, PermisoSeguimiento
 from services.analytics_service import AnalyticsService
+from services.personalization_service import PersonalizationService
+from services.time_tracking_service import TimeTrackingService
 from ui.components import ComponenteUI, LogoMITA, NotificationService
 from ui.i18n import IDIOMAS, establecer_idioma, idioma_actual, traducir
 from ui.views.role_views import VistaAdmin, VistaAdultoMayor, VistaCuidador, VistaFamiliar
@@ -46,8 +53,11 @@ class MitaApp(ctk.CTk):
         self.configure(fg_color=BG_COLOR)
         self.font_scale = 1.0
         self.tema_oscuro = ctk.BooleanVar(value=False)
+        self.tema_personal = "clasico"
+        self.preferencias_usuario = {}
         self.actividad_actual = None
         self.rol_seleccionado = None
+        self._inicio_sesion_fecha = None
 
         # Capa de servicios (SRP / RNF08)
         self.db_service = DatabaseManager()
@@ -55,11 +65,15 @@ class MitaApp(ctk.CTk):
         self.progreso_repo = ProgresoRepository(self.db_service)
         self.comunidad_repo = ComunidadRepository(self.db_service)
         self.estadistica_repo = EstadisticaRepository(self.db_service)
+        self.preferencias_repo = PreferenciasRepository(self.db_service)
+        self.registro_uso_repo = RegistroUsoRepository(self.db_service)
         self.auth_service = AuthService(self.user_repo)
         self.admin_service = AdministradorUsuarios(self.user_repo, self.db_service)
         self.comunidad_service = ComunidadService(self.comunidad_repo)
         self.permiso_service = PermisoSeguimiento(self.user_repo)
         self.analytics_service = AnalyticsService(self.estadistica_repo)
+        self.personalization_service = PersonalizationService(self.preferencias_repo)
+        self.time_tracking_service = TimeTrackingService()
         self.mongo_session_id = None
         self.sync_service = GestorSincronizacionLocal(self.db_service)
         self.gestor_progreso = GestorProgreso()
@@ -71,24 +85,32 @@ class MitaApp(ctk.CTk):
         self.vista_cuidador = VistaCuidador(self)
         self.vista_admin = VistaAdmin(self)
 
+        self.estado_red = comprobar_red()
         self._crear_barra_accesibilidad()
         self.main_container = ctk.CTkFrame(self, fg_color=BG_COLOR)
         self.main_container.pack(fill="both", expand=True)
 
         self.bind(ADMIN_SECRET_COMBO, self._abrir_admin_secreto)
-        self.mostrar_bienvenida()
+        self.protocol("WM_DELETE_WINDOW", self._cerrar_ventana)
+        self.after(150, self._restaurar_ultima_sesion)
 
     def limpiar_pantalla(self) -> None:
         for w in self.main_container.winfo_children():
             w.destroy()
         self.after_idle(self.aplicar_idioma_actual)
 
-    def ajustar_texto(self, factor: float) -> None:
-        self.font_scale = max(0.8, min(1.5, self.font_scale * factor))
+    def ajustar_texto(self, pasos: int) -> None:
+        """Aumenta o reduce exactamente en pasos de 5 %."""
+        self.font_scale = round(max(0.8, min(1.5, self.font_scale + pasos * 0.05)), 2)
         ctk.set_widget_scaling(self.font_scale)
+        usuario = SessionManager().usuario_actual
+        if usuario and usuario.id:
+            self.preferencias_usuario = self.personalization_service.guardar(
+                usuario.id, {"font_scale": self.font_scale}
+            )
         NotificationService.mostrar(
             self.main_container,
-            f"Tamaño de texto ajustado ({int(self.font_scale * 100)}%)",
+            f"Tamaño de texto al {int(round(self.font_scale * 100))}%",
         )
 
     def _crear_barra_accesibilidad(self) -> None:
@@ -101,11 +123,11 @@ class MitaApp(ctk.CTk):
         )
         self._texto_accesibilidad.pack(side="left", padx=(18, 8), pady=7)
         ctk.CTkButton(
-            barra, text="A−", width=42, height=32, command=lambda: self.ajustar_texto(0.9),
+            barra, text="A−", width=42, height=32, command=lambda: self.ajustar_texto(-1),
             font=ComponenteUI.fuente(16, bold=True), fg_color=ACCENT_GREEN,
         ).pack(side="left", padx=2, pady=7)
         ctk.CTkButton(
-            barra, text="A+", width=42, height=32, command=lambda: self.ajustar_texto(1.1),
+            barra, text="A+", width=42, height=32, command=lambda: self.ajustar_texto(1),
             font=ComponenteUI.fuente(16, bold=True), fg_color=ACCENT_GREEN,
         ).pack(side="left", padx=2, pady=7)
         self._switch_tema = ctk.CTkSwitch(
@@ -113,6 +135,16 @@ class MitaApp(ctk.CTk):
             font=ComponenteUI.fuente(14), progress_color=ACCENT_GREEN,
         )
         self._switch_tema.pack(side="left", padx=16, pady=7)
+        self._estado_red = ctk.CTkLabel(
+            barra, text=self.estado_red.descripcion, font=ComponenteUI.fuente(13), text_color=TEXT_GRAY,
+        )
+        self._estado_red.pack(side="left", padx=4)
+        self._btn_config = ctk.CTkButton(
+            barra, text="⚙ Configuración", width=150, height=32,
+            command=self.mostrar_configuracion_usuario, font=ComponenteUI.fuente(13),
+            fg_color="transparent", text_color=ACCENT_GREEN, hover_color=SOFT_GREEN,
+        )
+        self._btn_config.pack(side="left", padx=6)
         self._texto_idioma = ctk.CTkLabel(
             barra, text="Idioma", font=ComponenteUI.fuente(14), text_color=DARK_TEXT,
         )
@@ -126,6 +158,94 @@ class MitaApp(ctk.CTk):
 
     def cambiar_tema(self) -> None:
         ctk.set_appearance_mode("dark" if self.tema_oscuro.get() else "light")
+        usuario = SessionManager().usuario_actual
+        if usuario and usuario.id:
+            self.personalization_service.guardar(usuario.id, {"modo_oscuro": self.tema_oscuro.get()})
+
+    def _aplicar_preferencias(self, usuario) -> None:
+        if not usuario or not usuario.id:
+            return
+        self.preferencias_usuario = self.personalization_service.obtener(usuario.id)
+        self.font_scale = float(self.preferencias_usuario.get("font_scale", 1.0))
+        ctk.set_widget_scaling(self.font_scale)
+        self.tema_personal = self.preferencias_usuario.get("tema", "clasico")
+        ComponenteUI.establecer_tema(self.tema_personal)
+        self.tema_oscuro.set(bool(self.preferencias_usuario.get("modo_oscuro", False)))
+        ctk.set_appearance_mode("dark" if self.tema_oscuro.get() else "light")
+
+    def _restaurar_ultima_sesion(self) -> None:
+        usuario = SessionManager().restaurar_sesion(self.user_repo)
+        if usuario:
+            self._activar_sesion(usuario, restaurada=True)
+        else:
+            self.mostrar_bienvenida()
+
+    def _activar_sesion(self, usuario, restaurada: bool = False) -> None:
+        self._aplicar_preferencias(usuario)
+        self.time_tracking_service.iniciar_sesion()
+        self._inicio_sesion_fecha = datetime.now()
+        if not restaurada:
+            self.mongo_session_id = self.analytics_service.registrar_login(usuario.id or 0)
+            if self.preferencias_usuario.get("mantener_sesion", True):
+                SessionManager().guardar_sesion_persistente(usuario)
+        self._cargar_progreso_usuario(usuario)
+        mensaje = "Sesión restaurada en este dispositivo." if restaurada else MensajeMITA.ACCESO_CORRECTO.value
+        self._ir_a_panel(usuario, mensaje)
+
+    def _actualizar_estado_red(self) -> None:
+        self.estado_red = comprobar_red()
+        self._estado_red.configure(text=self.estado_red.descripcion)
+
+    def mostrar_configuracion_usuario(self) -> None:
+        usuario = SessionManager().usuario_actual
+        if not usuario or not usuario.id:
+            NotificationService.mostrar(self.main_container, "Inicia sesión para personalizar MITA.", es_error=True)
+            return
+        ventana = ctk.CTkToplevel(self)
+        ventana.title("Configuración personal")
+        ventana.geometry("550x620")
+        ventana.transient(self)
+        ventana.grab_set()
+        ventana.configure(fg_color=BG_COLOR)
+        prefs = self.personalization_service.obtener(usuario.id)
+        ComponenteUI.titulo(ventana, "Configuración personal", 26).pack(pady=(22, 8))
+        ctk.CTkLabel(ventana, text="Estos ajustes son opcionales y se guardan sólo para tu cuenta.", font=ComponenteUI.fuente(14), text_color=TEXT_GRAY, wraplength=470).pack(padx=24)
+        ctk.CTkLabel(ventana, text="Tema de color", font=ComponenteUI.fuente(15, bold=True)).pack(anchor="w", padx=38, pady=(18, 2))
+        selector_tema = ctk.CTkOptionMenu(ventana, values=["clasico", "oceano", "lavanda", "calido"], width=300)
+        selector_tema.set(prefs.get("tema", "clasico"))
+        selector_tema.pack(padx=38, pady=4)
+        ctk.CTkLabel(ventana, text="Estilo de instrucciones", font=ComponenteUI.fuente(15, bold=True)).pack(anchor="w", padx=38, pady=(12, 2))
+        selector_estilo = ctk.CTkOptionMenu(ventana, values=["ilustrado", "guía paso a paso"], width=300)
+        selector_estilo.set(prefs.get("estilo_instrucciones", "ilustrado"))
+        selector_estilo.pack(padx=38, pady=4)
+        ctk.CTkLabel(ventana, text="Intereses (separados por coma)", font=ComponenteUI.fuente(15, bold=True)).pack(anchor="w", padx=38, pady=(12, 2))
+        intereses = ComponenteUI.entrada(ventana, "Ej. música, jardinería, familia", ancho=420)
+        intereses.insert(0, ", ".join(prefs.get("intereses") or []))
+        intereses.pack(padx=38, pady=4)
+        recordatorio = ctk.BooleanVar(value=bool(prefs.get("recordatorio_diario", False)))
+        mantener = ctk.BooleanVar(value=bool(prefs.get("mantener_sesion", True)))
+        animaciones = ctk.BooleanVar(value=bool(prefs.get("animaciones_suaves", True)))
+        ctk.CTkCheckBox(ventana, text="Recordatorio diario opcional", variable=recordatorio, font=ComponenteUI.fuente(14)).pack(anchor="w", padx=38, pady=(15, 4))
+        ctk.CTkCheckBox(ventana, text="Mantener sesión en este dispositivo", variable=mantener, font=ComponenteUI.fuente(14)).pack(anchor="w", padx=38, pady=4)
+        ctk.CTkCheckBox(ventana, text="Animaciones suaves", variable=animaciones, font=ComponenteUI.fuente(14)).pack(anchor="w", padx=38, pady=4)
+        def guardar() -> None:
+            lista = [x.strip() for x in intereses.get().split(",") if x.strip()][:6]
+            self.preferencias_usuario = self.personalization_service.guardar(usuario.id, {
+                "tema": selector_tema.get(), "estilo_instrucciones": selector_estilo.get(),
+                "intereses": lista, "recordatorio_diario": recordatorio.get(),
+                "mantener_sesion": mantener.get(), "animaciones_suaves": animaciones.get(),
+            })
+            self.tema_personal = selector_tema.get()
+            ComponenteUI.establecer_tema(self.tema_personal)
+            if mantener.get():
+                SessionManager().guardar_sesion_persistente(usuario)
+            else:
+                SessionManager().cerrar_sesion(borrar_persistida=True)
+                SessionManager().usuario_actual = usuario
+            ventana.destroy()
+            NotificationService.mostrar(self.main_container, "Configuración guardada.")
+        ComponenteUI.boton(ventana, "Guardar preferencias", guardar, ancho=300).pack(pady=22)
+        ComponenteUI.boton(ventana, "Actualizar estado de red", self._actualizar_estado_red, ancho=300, color=TEXT_GRAY).pack(pady=(0, 16))
 
     def cambiar_idioma(self, etiqueta: str) -> None:
         codigo = next((key for key, value in IDIOMAS.items() if value == etiqueta), "es")
@@ -176,7 +296,7 @@ class MitaApp(ctk.CTk):
         def intentar():
             ok, msj, user = self.auth_service.login(entry_u.get(), entry_p.get(), "Administrador")
             if ok and user and user.rol == "Administrador":
-                self.vista_admin.dashboard()
+                self._activar_sesion(user)
             else:
                 NotificationService.mostrar(frame, "Acceso denegado", es_error=True)
 
@@ -187,7 +307,6 @@ class MitaApp(ctk.CTk):
     # PANTALLA BIENVENIDA — 3 opciones de rol
     # ------------------------------------------------------------------
     def mostrar_bienvenida(self, feedback: str = None) -> None:
-        SessionManager().cerrar_sesion()
         self.limpiar_pantalla()
 
         left = ctk.CTkFrame(self.main_container, width=380, corner_radius=20, fg_color=BG_WARM)
@@ -359,8 +478,16 @@ class MitaApp(ctk.CTk):
 
         self.entry_usuario = ComponenteUI.entrada(frame, "Correo o nombre completo")
         self.entry_usuario.pack(pady=8)
+        self.label_error_usuario = ctk.CTkLabel(
+            frame, text="", text_color=ERROR_COLOR, font=ComponenteUI.fuente(13), wraplength=420,
+        )
+        self.label_error_usuario.pack(pady=(0, 4))
         self.entry_pass = ComponenteUI.entrada(frame, "Contraseña", password=True)
         self.entry_pass.pack(pady=8)
+        self.label_error_pass = ctk.CTkLabel(
+            frame, text="", text_color=ERROR_COLOR, font=ComponenteUI.fuente(13), wraplength=420,
+        )
+        self.label_error_pass.pack(pady=(0, 4))
 
         ComponenteUI.boton(frame, "Entrar", self.ejecutar_login, ancho=380, grande=True).pack(pady=20)
 
@@ -394,11 +521,24 @@ class MitaApp(ctk.CTk):
     def ejecutar_login(self) -> None:
         u = self.entry_usuario.get().strip()
         p = self.entry_pass.get().strip()
+        # Limpia errores anteriores
+        if hasattr(self, "label_error_usuario"):
+            self.label_error_usuario.configure(text="")
+        if hasattr(self, "label_error_pass"):
+            self.label_error_pass.configure(text="")
         ok, msj, usuario = self.auth_service.login(u, p, self.rol_seleccionado)
         if ok:
-            self.mongo_session_id = self.analytics_service.registrar_login(usuario.id or 0)
-            self._cargar_progreso_usuario(usuario)
-            self._ir_a_panel(usuario, msj)
+            self._activar_sesion(usuario)
+            return
+        # Mostrar el error en el campo que corresponde para que el usuario sepa qué corregir.
+        mensaje_bajo = MensajeMITA.USUARIO_NO_ENCONTRADO.value
+        mensaje_pwd = MensajeMITA.CONTRASENA_INCORRECTA.value
+        if msj == mensaje_bajo and hasattr(self, "label_error_usuario"):
+            self.label_error_usuario.configure(text=msj)
+            self.entry_usuario.focus_set()
+        elif msj == mensaje_pwd and hasattr(self, "label_error_pass"):
+            self.label_error_pass.configure(text=msj)
+            self.entry_pass.focus_set()
         else:
             NotificationService.mostrar(self.main_container, msj, es_error=True)
 
@@ -424,12 +564,27 @@ class MitaApp(ctk.CTk):
 
     def cerrar_sesion(self) -> None:
         usuario = SessionManager().usuario_actual
+        duracion = self.time_tracking_service.finalizar_sesion()
         self.analytics_service.registrar_logout(
-            usuario.id if usuario else None, self.mongo_session_id
+            usuario.id if usuario else None, self.mongo_session_id, duracion
         )
+        if usuario and usuario.id and self._inicio_sesion_fecha:
+            self.registro_uso_repo.registrar_sesion(usuario.id, self._inicio_sesion_fecha, duracion)
         self.mongo_session_id = None
         SessionManager().cerrar_sesion()
         self.mostrar_bienvenida(MensajeMITA.SESION_CERRADA.value)
+
+    def _cerrar_ventana(self) -> None:
+        """Registra la duración sin cerrar la sesión persistente al apagar."""
+        usuario = SessionManager().usuario_actual
+        duracion = self.time_tracking_service.finalizar_sesion()
+        if usuario and usuario.id:
+            self.analytics_service.registrar_logout(usuario.id, self.mongo_session_id, duracion)
+            if self._inicio_sesion_fecha:
+                self.registro_uso_repo.registrar_sesion(usuario.id, self._inicio_sesion_fecha, duracion)
+            if self.preferencias_usuario.get("mantener_sesion", True):
+                SessionManager().guardar_sesion_persistente(usuario)
+        self.destroy()
 
     # ------------------------------------------------------------------
     # REGISTROS
