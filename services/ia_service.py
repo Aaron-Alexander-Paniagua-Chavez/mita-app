@@ -73,7 +73,7 @@ class AsistenteIA:
         if self.conectado and self.client:
             try:
                 api_key = os.getenv("GEMINI_API_KEY")
-                self.chat_session = self.client.chats.create(model="gemini-2.5-flash")
+                self.chat_session = self.client.chats.create(model="gemini-3.6-flash")
                 LOG.info("Conversación de IA reiniciada")
             except Exception as e:
                 LOG.error(f"Error al reiniciar conversación de IA: {e}")

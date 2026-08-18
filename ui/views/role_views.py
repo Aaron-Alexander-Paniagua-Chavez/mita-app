@@ -173,7 +173,7 @@ class VistaAdultoMayor(VistaMixin):
 
         scroll = ctk.CTkScrollableFrame(frame, fg_color="transparent")
         scroll.pack(fill="both", expand=True)
-        for ej in actividades:
+        for ej in actividades_fisicas:
             card = ctk.CTkFrame(scroll, fg_color=SURFACE_COLOR, corner_radius=10)
             card.pack(fill="x", pady=6)
             ctk.CTkLabel(
