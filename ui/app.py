@@ -401,7 +401,7 @@ class MitaApp(ctk.CTk):
         campos = (
             ("Servidor", "host", valores.get("host", "localhost"), False),
             ("Puerto", "port", str(valores.get("port", 3306)), False),
-            ("Base de datos", "database", valores.get("database", "mita_local"), False),
+            ("Base de datos", "database", valores.get("database", "SistemaGeriatrico"), False),
             ("Usuario de la aplicación", "user", valores.get("user", "root"), False),
             ("Contraseña de la aplicación", "password", "", True),
             ("Usuario administrador", "admin_user", valores.get("user", "root"), False),
@@ -425,7 +425,8 @@ class MitaApp(ctk.CTk):
             ok, mensaje = self.db_service.configurar_mysql(
                 host=entradas["host"].get(),
                 port=entradas["port"].get(),
-                database=entradas["database"].get(),
+                # Use actual working database as default when value is empty
+            database=entradas["database"].get() or "SistemaGeriatrico",
                 user=entradas["user"].get(),
                 password=entradas["password"].get(),
                 admin_user=entradas["admin_user"].get(),

@@ -126,7 +126,7 @@ def _int_env(name: str, default: int) -> int:
 # Persistencia. Los valores por defecto permiten desarrollo local sin secretos.
 MYSQL_HOST = _valor_configuracion("MYSQL_HOST", "127.0.0.1")
 MYSQL_PORT = _int_env("MYSQL_PORT", _CONFIG_LOCAL.get("MYSQL_PORT", 3306))
-MYSQL_DATABASE = _valor_configuracion("MYSQL_DATABASE", "mita_local")
+MYSQL_DATABASE = _valor_configuracion("MYSQL_DATABASE", "SistemaGeriatrico")
 MYSQL_USER = _valor_configuracion("MYSQL_USER", "root")
 MYSQL_PASSWORD = _valor_configuracion("MYSQL_PASSWORD", "")
 MYSQL_ADMIN_USER = _valor_configuracion("MYSQL_ADMIN_USER", MYSQL_USER)
