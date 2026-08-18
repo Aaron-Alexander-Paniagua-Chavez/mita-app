@@ -20,6 +20,7 @@ from models.actividad import Actividad, AdaptadorEjercicios
 from models.progreso import GestorProgreso, PanelCuidador, ReporteCuidador, SistemaLogros
 from models.usuario import AdultoMayor
 from ui.components import ComponenteUI, GuiaVisual, LogoMITA, NotificationService
+from services.activity_filter_service import ActivityFilterService
 
 
 class VistaMixin:
@@ -149,12 +150,25 @@ class VistaAdultoMayor(VistaMixin):
         usuario = SessionManager().usuario_actual
         limitaciones = "Ninguna"
         movilidad = "Normal"
+        dificultades = "Ninguna"
+        actividades_excluidas = []
+
         if isinstance(usuario, AdultoMayor):
             limitaciones = usuario.limitaciones_movilidad
             movilidad = usuario.nivel_movilidad
+            dificultades = usuario.dificultades_cognitivas
+            # Obtener preferencias personalizadas del usuario
+            prefs = self.app.activity_filter_service.obtener_limitaciones_usuario(usuario.id or 0)
+            limitaciones = prefs.get("limitaciones_movilidad", limitaciones)
+            dificultades = prefs.get("dificultades_cognitivas", dificultades)
+            actividades_excluidas = prefs.get("actividades_excluidas", [])
 
-        actividades, msj = AdaptadorEjercicios.filtrar_fisicos(limitaciones, movilidad)
-        NotificationService.mostrar(frame, msj)
+        # Filtrar actividades físicas según preferencias del usuario
+        actividades_fisicas_raw, msj_fisico = AdaptadorEjercicios.filtrar_fisicos(limitaciones, movilidad)
+        actividades_fisicas = self.app.activity_filter_service.filtrar_actividades(
+            actividades_fisicas_raw, usuario.id or 0
+        )
+        NotificationService.mostrar(frame, msj_fisico)
         ComponenteUI.titulo(frame, "Ejercicios físicos").pack(anchor="w", pady=(0, 12))
 
         scroll = ctk.CTkScrollableFrame(frame, fg_color="transparent")
@@ -178,13 +192,26 @@ class VistaAdultoMayor(VistaMixin):
         self.boton_volver(frame, self.dashboard)
         ComponenteUI.titulo(frame, "Actividades cognitivas").pack(anchor="w", pady=(0, 4))
         usuario = SessionManager().usuario_actual
-        dificultades = usuario.dificultades_cognitivas if isinstance(usuario, AdultoMayor) else "Ninguna"
-        actividades, mensaje = AdaptadorEjercicios.filtrar_cognitivos(dificultades)
+        dificultades = "Ninguna"
+        actividades_excluidas = []
+
+        if isinstance(usuario, AdultoMayor):
+            dificultades = usuario.dificultades_cognitivas
+            # Obtener preferencias personalizadas del usuario
+            prefs = self.app.activity_filter_service.obtener_limitaciones_usuario(usuario.id or 0)
+            dificultades = prefs.get("dificultades_cognitivas", dificultades)
+            actividades_excluidas = prefs.get("actividades_excluidas", [])
+
+        # Filtrar actividades cognitivas según preferencias del usuario
+        actividades_cognitivas_raw, mensaje = AdaptadorEjercicios.filtrar_cognitivos(dificultades)
+        actividades_cognitivas = self.app.activity_filter_service.filtrar_actividades(
+            actividades_cognitivas_raw, usuario.id or 0
+        )
         NotificationService.mostrar(frame, mensaje)
 
         scroll = ctk.CTkScrollableFrame(frame, fg_color="transparent")
         scroll.pack(fill="both", expand=True)
-        for ej in actividades:
+        for ej in actividades_cognitivas:
             card = ctk.CTkFrame(scroll, fg_color=SURFACE_COLOR, corner_radius=10)
             card.pack(fill="x", pady=6)
             ctk.CTkLabel(
@@ -494,6 +521,7 @@ class VistaAdmin(VistaMixin):
             ).pack(side="right", padx=8)
 
         ComponenteUI.boton(frame, "Comprobar conexión MySQL", self._sync, ancho=260).pack(pady=8)
+        ComponenteUI.boton(frame, "Probar IA", self._probar_ia, ancho=120).pack(pady=4, side="left", padx=(0, 4))
         ComponenteUI.boton(frame, "Salir del panel admin", self.app.mostrar_bienvenida, ancho=220, color=TEXT_GRAY).pack(pady=4)
 
     def _restablecer_contrasena(self, user_id: int) -> None:
@@ -535,3 +563,118 @@ class VistaAdmin(VistaMixin):
             "MySQL no está disponible. Inicia el servicio para guardar información."
         )
         NotificationService.mostrar(self.app.main_container, mensaje, es_error=n < 0)
+
+    def _probar_ia(self) -> None:
+        """Abre una ventana simple para probar la IA."""
+        if not self.app.ia_service.conectado:
+            NotificationService.mostrar(
+                self.app.main_container,
+                "IA no disponible. Configure GEMINI_API_KEY en .env para usar esta función.",
+                es_error=True,
+            )
+            return
+
+        # Ventana de prueba de IA
+        ventana = ctk.CTkToplevel(self.app)
+        ventana.title("Prueba de IA - MITA")
+        ventana.geometry("500x400")
+        ventana.transient(self.app)
+        ventana.grab_set()
+        ventana.configure(fg_color=BG_COLOR)
+
+        # Título
+        ComponenteUI.titulo(ventana, "Chat con IA de MITA", 20).pack(pady=(20, 10))
+        ComponenteUI.subtitulo(
+            ventana,
+            "Nota: No comparta información clínica o personal sensible",
+            12,
+            text_color=TEXT_GRAY,
+        ).pack(pady=(0, 20))
+
+        # Área de chat
+        chat_frame = ctk.CTkFrame(ventana, fg_color=SURFACE_COLOR)
+        chat_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+
+        historial = ctk.CTkTextbox(chat_frame, width=460, height=250)
+        historial.pack(fill="both", expand=True, padx=10, pady=10)
+        historial.configure(state="disabled")
+
+        # Input y botón
+        input_frame = ctk.CTkFrame(ventana, fg_color="transparent")
+        input_frame.pack(fill="x", padx=20, pady=(0, 20))
+
+        entrada = ctk.CTkEntry(
+            input_frame,
+            placeholder_text="Escribe tu mensaje para la IA...",
+            width=300,
+        )
+        entrada.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        entrada.bind("<Return>", lambda e: _enviar())
+
+        def _enviar() -> None:
+            texto = entrada.get().strip()
+            if not texto:
+                return
+
+            # Mostrar mensaje del usuario
+            historial.configure(state="normal")
+            historial.insert("end", f"Tú: {texto}\n")
+            historial.configure(state="disabled")
+            historial.see("end")
+
+            # Limpiar entrada
+            entrada.delete(0, "end")
+
+            # Mostrar indicador de "pensando..."
+            historial.configure(state="normal")
+            historial.insert("end", "IA: pensando...\n")
+            historial.configure(state="disabled")
+            historial.see("end")
+
+            # Obtener respuesta en segundo plano para no bloquear UI
+            def obtener_respuesta():
+                respuesta = self.app.ia_service.enviar_mensaje(texto)
+                # Actualizar UI desde el hilo principal
+                ventana.after(0, lambda: _mostrar_respuesta(respuesta))
+
+            def _mostrar_respuesta(respuesta: str) -> None:
+                historial.configure(state="normal")
+                # Eliminar la línea "pensando..."
+                historial.delete("end-2l", "end")
+                # Mostrar respuesta real
+                historial.insert("end", f"IA: {respuesta}\n\n")
+                historial.configure(state="disabled")
+                historial.see("end")
+
+            threading.Thread(target=obtener_respuesta, daemon=True).start()
+
+        boton_enviar = ctk.CTkButton(
+            input_frame,
+            text="Enviar",
+            width=80,
+            command=_enviar,
+        )
+        boton_enviar.pack(side="right")
+
+        # Botón para limpiar chat
+        def _limpiar() -> None:
+            historial.configure(state="normal")
+            historial.delete("1.0", "end")
+            historial.configure(state="disabled")
+            # Reiniciar conversación para limpiar contexto
+            self.app.ia_service.reiniciar_conversacion()
+
+        boton_limpiar = ctk.CTkButton(
+            ventana,
+            text="Limpiar chat",
+            width=100,
+            height=28,
+            command=_limpiar,
+            fg_color="transparent",
+            text_color=TEXT_GRAY,
+            hover_color=SOFT_GREEN,
+        )
+        boton_limpiar.pack(pady=(0, 20))
+
+        # Enfoque inicial en la entrada
+        entrada.focus()

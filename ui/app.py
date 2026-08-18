@@ -34,6 +34,8 @@ from services.comunidad_service import ComunidadService, PermisoSeguimiento
 from services.analytics_service import AnalyticsService
 from services.personalization_service import PersonalizationService
 from services.time_tracking_service import TimeTrackingService
+from services.activity_filter_service import ActivityFilterService
+from services.ia_service import AsistenteIA
 from ui.components import ComponenteUI, LogoMITA, NotificationService
 from ui.i18n import IDIOMAS, establecer_idioma, idioma_actual, traducir
 from ui.views.role_views import VistaAdmin, VistaAdultoMayor, VistaCuidador, VistaFamiliar
@@ -73,7 +75,9 @@ class MitaApp(ctk.CTk):
         self.permiso_service = PermisoSeguimiento(self.user_repo)
         self.analytics_service = AnalyticsService(self.estadistica_repo)
         self.personalization_service = PersonalizationService(self.preferencias_repo)
+        self.activity_filter_service = ActivityFilterService(self.preferencias_repo)
         self.time_tracking_service = TimeTrackingService()
+        self.ia_service = AsistenteIA()
         self.mongo_session_id = None
         self.sync_service = GestorSincronizacionLocal(self.db_service)
         self.gestor_progreso = GestorProgreso()
@@ -228,12 +232,36 @@ class MitaApp(ctk.CTk):
         ctk.CTkCheckBox(ventana, text="Recordatorio diario opcional", variable=recordatorio, font=ComponenteUI.fuente(14)).pack(anchor="w", padx=38, pady=(15, 4))
         ctk.CTkCheckBox(ventana, text="Mantener sesión en este dispositivo", variable=mantener, font=ComponenteUI.fuente(14)).pack(anchor="w", padx=38, pady=4)
         ctk.CTkCheckBox(ventana, text="Animaciones suaves", variable=animaciones, font=ComponenteUI.fuente(14)).pack(anchor="w", padx=38, pady=4)
+
+        # Sección de limitaciones de actividades
+        ctk.CTkLabel(ventana, text="Limitaciones de movimiento (ej: rodilla, espalda, cadera)", font=ComponenteUI.fuente(14, bold=True)).pack(anchor="w", padx=38, pady=(15, 2))
+        limitaciones_entry = ctk.CTkEntry(ventana, placeholder_text="Ej: rodilla, espalda", ancho=420)
+        limitaciones_entry.insert(0, prefs.get("limitaciones_movilidad", ""))
+        limitaciones_entry.pack(padx=38, pady=2)
+
+        ctk.CTkLabel(ventana, text="Dificultades cognitivas (ej: memoria,alzheimer)", font=ComponenteUI.fuente(14, bold=True)).pack(anchor="w", padx=38, pady=(10, 2))
+        dificultades_entry = ctk.CTkEntry(ventana, placeholder_text="Ej: memoria,alzheimer", ancho=420)
+        dificultades_entry.insert(0, prefs.get("dificultades_cognitivas", ""))
+        dificultades_entry.pack(padx=38, pady=2)
+
+        ctk.CTkLabel(ventana, text="Actividades a excluir (separadas por coma)", font=ComponenteUI.fuente(14, bold=True)).pack(anchor="w", padx=38, pady=(10, 2))
+        excluidos_entry = ctk.CTkEntry(ventana, placeholder_text="Ej: Sentadillas, Equilibrio", ancho=420)
+        excluidos_entry.insert(0, ", ".join(prefs.get("actividades_excluidas", [])))
+        excluidos_entry.pack(padx=38, pady=2)
+
         def guardar() -> None:
             lista = [x.strip() for x in intereses.get().split(",") if x.strip()][:6]
+            limitaciones = limitaciones_entry.get().strip()
+            dificultades = dificultades_entry.get().strip()
+            excluidos = [x.strip().lower() for x in excluidos_entry.get().split(",") if x.strip()]
+
             self.preferencias_usuario = self.personalization_service.guardar(usuario.id, {
                 "tema": selector_tema.get(), "estilo_instrucciones": selector_estilo.get(),
                 "intereses": lista, "recordatorio_diario": recordatorio.get(),
                 "mantener_sesion": mantener.get(), "animaciones_suaves": animaciones.get(),
+                "limitaciones_movilidad": limitaciones,
+                "dificultades_cognitivas": dificultades,
+                "actividades_excluidas": excluidos
             })
             self.tema_personal = selector_tema.get()
             ComponenteUI.establecer_tema(self.tema_personal)

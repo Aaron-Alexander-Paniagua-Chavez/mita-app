@@ -15,6 +15,8 @@ DEFAULT_PREFERENCIAS: dict[str, Any] = {
     "mantener_sesion": True,
     "font_scale": 1.0,
     "modo_oscuro": False,
+    "limitaciones_movilidad": "",
+    "dificultades_cognitivas": "",
 }
 
 
