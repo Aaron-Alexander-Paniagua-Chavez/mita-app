@@ -62,7 +62,12 @@ MYSQL_TABLE_DDL = (
         perfil_medico TEXT NULL,
         descripcion_habitos TEXT NULL,
         imc DECIMAL(5,2) NULL,
+
+        CONSTRAINT chk_adulto_imc
+            CHECK (imc IS NULL OR imc > 0),
+
         UNIQUE KEY uk_adulto_usuario (id_usuario),
+
         CONSTRAINT fk_adulto_usuario FOREIGN KEY (id_usuario)
             REFERENCES usuarios(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -281,9 +286,25 @@ MYSQL_TABLE_DDL = (
         desempeno VARCHAR(50) NULL,
         puntos INT NOT NULL DEFAULT 0,
         observaciones TEXT NULL,
+
+        CONSTRAINT chk_registro_actividad_puntos
+            CHECK (puntos >= 0),
+
+        CONSTRAINT chk_registro_actividad_nivel
+            CHECK (nivel_alcanzado IS NULL OR nivel_alcanzado >= 0),
+
+        CONSTRAINT chk_registro_actividad_horas
+            CHECK (
+                hora_inicio IS NULL
+                OR hora_fin IS NULL
+                OR hora_fin >= hora_inicio
+            ),
+
         KEY idx_registro_actividad_usuario_fecha (id_usuario, fecha),
+
         CONSTRAINT fk_registro_actividad_usuario FOREIGN KEY (id_usuario)
             REFERENCES usuarios(id) ON DELETE CASCADE,
+
         CONSTRAINT fk_registro_actividad_actividad FOREIGN KEY (id_actividad)
             REFERENCES actividad(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -457,7 +478,9 @@ MYSQL_TABLE_DDL = (
         inicio DATETIME NOT NULL,
         fin DATETIME NOT NULL,
         duracion_segundos INT UNSIGNED NOT NULL DEFAULT 0,
+
         KEY idx_sesiones_uso_usuario_inicio (id_usuario, inicio),
+
         CONSTRAINT fk_sesiones_uso_usuario FOREIGN KEY (id_usuario)
             REFERENCES usuarios(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -470,7 +493,9 @@ MYSQL_TABLE_DDL = (
         categoria VARCHAR(50) NOT NULL,
         duracion_segundos INT UNSIGNED NOT NULL DEFAULT 0,
         fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
         KEY idx_tiempos_actividad_usuario_fecha (id_usuario, fecha_hora),
+
         CONSTRAINT fk_tiempos_actividad_usuario FOREIGN KEY (id_usuario)
             REFERENCES usuarios(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
