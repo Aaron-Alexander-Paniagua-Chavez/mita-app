@@ -36,7 +36,7 @@ class PermisoSeguimiento:
 
         usuario = UsuarioRepository.dict_a_usuario(adulto_data)
         progreso = GestorProgreso()
-        progreso.cargar_desde_db(progreso_repo.obtener_progreso(id_adulto))
+        progreso.cargar_desde_db(progreso_repo.obtener_progreso_vista(id_adulto))
         reporte = ReporteFamiliar()
         return reporte.generar_resumen(usuario, progreso), MensajeMITA.INFO_FAMILIAR.value
 

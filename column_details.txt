@@ -1,0 +1,192 @@
+TABLE_NAME	COLUMN_NAME	COLUMN_TYPE	IS_NULLABLE	COLUMN_DEFAULT	COLUMN_KEY	EXTRA
+actividad	id	int	NO	NULL	PRI	auto_increment
+actividad	nombre	varchar(160)	NO	NULL		
+actividad	descripcion	text	YES	NULL		
+actividad	nivel	tinyint unsigned	NO	1		
+actividad	impacto	varchar(30)	YES	NULL		
+actividad	activa	tinyint(1)	NO	1		
+actividad	id_tipo_actividad	int	NO	1	MUL	
+adulto_alergia	id_adulto	int	NO	NULL	PRI	
+adulto_alergia	id_alergia	int	NO	NULL	PRI	
+adulto_alergia	observaciones	varchar(255)	YES	NULL		
+adulto_antecedente	id_adulto	int	NO	NULL	PRI	
+adulto_antecedente	id_antecedente	int	NO	NULL	PRI	
+adulto_antecedente	observaciones	varchar(255)	YES	NULL		
+adulto_dificultad	id_adulto	int	NO	NULL	PRI	
+adulto_dificultad	id_dificultad	int	NO	NULL	PRI	
+adulto_dificultad	nivel	varchar(50)	YES	NULL		
+adulto_habito	id_adulto	int	NO	NULL	PRI	
+adulto_habito	id_habito	int	NO	NULL	PRI	
+adulto_habito	frecuencia	varchar(80)	YES	NULL		
+adulto_mayor	id	int	NO	NULL	PRI	auto_increment
+adulto_mayor	id_usuario	int	NO	NULL	UNI	
+adulto_mayor	fecha_nacimiento	date	YES	NULL		
+adulto_mayor	descripcion_movilidad	text	YES	NULL		
+adulto_mayor	perfil_medico	text	YES	NULL		
+adulto_mayor	descripcion_habitos	text	YES	NULL		
+adulto_mayor	imc	decimal(5,2)	YES	NULL		
+alergia	id	int	NO	NULL	PRI	auto_increment
+alergia	nombre	varchar(120)	NO	NULL	UNI	
+alergia	descripcion	text	YES	NULL		
+antecedente_medico	id	int	NO	NULL	PRI	auto_increment
+antecedente_medico	nombre	varchar(150)	NO	NULL	UNI	
+antecedente_medico	descripcion	text	YES	NULL		
+auditoria	id	int	NO	NULL	PRI	auto_increment
+auditoria	accion	varchar(100)	NO	NULL		
+auditoria	detalle	text	YES	NULL		
+auditoria	id_admin	int	YES	NULL	MUL	
+auditoria	fecha_hora	datetime	NO	CURRENT_TIMESTAMP	MUL	DEFAULT_GENERATED
+contacto_emergencia	id	int	NO	NULL	PRI	auto_increment
+contacto_emergencia	id_adulto	int	NO	NULL	MUL	
+contacto_emergencia	nombre	varchar(150)	NO	NULL		
+contacto_emergencia	telefono	varchar(20)	NO	NULL		
+contacto_emergencia	relacion	varchar(80)	YES	NULL		
+cuidador	id	int	NO	NULL	PRI	auto_increment
+cuidador	id_usuario	int	NO	NULL	UNI	
+cuidador	cedula_medica	varchar(80)	YES	NULL	UNI	
+cuidador	especialidad	varchar(120)	YES	NULL		
+cuidador	id_tipo_cuidador	int	YES	NULL	MUL	
+dieta_adulto	id	int	NO	NULL	PRI	auto_increment
+dieta_adulto	id_adulto	int	NO	NULL	MUL	
+dieta_adulto	tipo_dieta	varchar(100)	YES	NULL		
+dieta_adulto	descripcion	text	YES	NULL		
+dieta_adulto	fecha_inicio	date	YES	NULL		
+dieta_adulto	fecha_fin	date	YES	NULL		
+dieta_adulto	activa	tinyint(1)	NO	1		
+dificultad_cognitiva	id	int	NO	NULL	PRI	auto_increment
+dificultad_cognitiva	nombre	varchar(120)	NO	NULL	UNI	
+dificultad_cognitiva	descripcion	text	YES	NULL		
+estado_toma	id_estado	int	NO	NULL	PRI	auto_increment
+estado_toma	nombre	varchar(50)	NO	NULL	UNI	
+estado_toma	descripcion	text	YES	NULL		
+familiar	id	int	NO	NULL	PRI	auto_increment
+familiar	id_usuario	int	NO	NULL	UNI	
+habito	id	int	NO	NULL	PRI	auto_increment
+habito	nombre	varchar(120)	NO	NULL	UNI	
+habito	descripcion	text	YES	NULL		
+habito	categoria	varchar(60)	YES	NULL		
+logro	id	int	NO	NULL	PRI	auto_increment
+logro	codigo	varchar(50)	NO	NULL	UNI	
+logro	nombre	varchar(120)	NO	NULL		
+logro	descripcion	text	YES	NULL		
+logro	puntos	int	NO	0		
+logros_usuario	id	int	NO	NULL	PRI	auto_increment
+logros_usuario	id_usuario	int	NO	NULL	UNI	
+logros_usuario	desbloqueado_en	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+logros_usuario	id_logro	int	NO	NULL		
+medicamento	id	int	NO	NULL	PRI	auto_increment
+medicamento	nombre	varchar(150)	NO	NULL	MUL	
+medicamento	presentacion	varchar(120)	YES	NULL		
+medicamento	indicaciones	text	YES	NULL		
+metrica_biometrica	id	int	NO	NULL	PRI	auto_increment
+metrica_biometrica	id_adulto	int	NO	NULL	MUL	
+metrica_biometrica	tipo	varchar(80)	NO	NULL		
+metrica_biometrica	valor	decimal(10,2)	NO	NULL		
+metrica_biometrica	unidad	varchar(30)	YES	NULL		
+metrica_biometrica	fecha_hora	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+notificacion	id	int	NO	NULL	PRI	auto_increment
+notificacion	id_usuario	int	NO	NULL	MUL	
+notificacion	id_registro_toma	int	YES	NULL	MUL	
+notificacion	tipo	varchar(50)	NO	NULL		
+notificacion	mensaje	text	NO	NULL		
+notificacion	fecha_programada	datetime	NO	NULL		
+notificacion	fecha_enviada	datetime	YES	NULL		
+notificacion	estado	enum('Pendiente','Enviado','Leido','Cancelado')	NO	Pendiente		
+preferencias_usuario	id_usuario	int	NO	NULL	PRI	
+preferencias_usuario	preferencias	json	NO	NULL		
+preferencias_usuario	actualizado_en	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+progreso	id_usuario	int	NO	NULL	PRI	
+progreso	puntos	int	NO	0		
+progreso	racha_dias	int	NO	0		
+progreso	actividades_completadas	int	NO	0		
+progreso	cognitivas_completadas	int	NO	0		
+progreso	ultima_actividad	datetime	YES	NULL		
+publicaciones	id	int	NO	NULL	PRI	auto_increment
+publicaciones	id_autor	int	NO	NULL	MUL	
+publicaciones	contenido	text	NO	NULL		
+publicaciones	fecha_hora	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+publicaciones	estado	enum('visible','oculta','eliminada')	NO	visible	MUL	
+registro_actividad	id	int	NO	NULL	PRI	auto_increment
+registro_actividad	id_usuario	int	NO	NULL	MUL	
+registro_actividad	id_actividad	int	YES	NULL	MUL	
+registro_actividad	fecha	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+registro_actividad	hora_inicio	datetime	YES	NULL		
+registro_actividad	hora_fin	datetime	YES	NULL		
+registro_actividad	nivel_alcanzado	tinyint	YES	NULL		
+registro_actividad	desempeno	varchar(50)	YES	NULL		
+registro_actividad	puntos	int	NO	0		
+registro_actividad	observaciones	text	YES	NULL		
+registro_sueno	id	int	NO	NULL	PRI	auto_increment
+registro_sueno	id_adulto	int	NO	NULL	MUL	
+registro_sueno	fecha	date	NO	NULL		
+registro_sueno	hora_inicio	time	YES	NULL		
+registro_sueno	hora_fin	time	YES	NULL		
+registro_sueno	duracion_minutos	int	YES	NULL		
+registro_sueno	calidad	varchar(50)	YES	NULL		
+registro_sueno	observaciones	text	YES	NULL		
+registro_toma	id	int	NO	NULL	PRI	auto_increment
+registro_toma	id_tratamiento	int	NO	NULL	MUL	
+registro_toma	fecha_hora	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+registro_toma	hora_programada	time	YES	NULL		
+registro_toma	hora_real	datetime	YES	NULL		
+registro_toma	observaciones	varchar(255)	YES	NULL		
+registro_toma	id_estado	int	NO	NULL	MUL	
+relaciones_familiar	id	int	NO	NULL	PRI	auto_increment
+relaciones_familiar	id_familiar	int	NO	NULL	MUL	
+relaciones_familiar	id_adulto	int	NO	NULL	MUL	
+relaciones_familiar	tipo_relacion	varchar(80)	YES	NULL		
+relaciones_familiar	autorizado	tinyint(1)	NO	1		
+relaciones_familiar	fecha_vinculo	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+sesiones_uso	id	bigint	NO	NULL	PRI	auto_increment
+sesiones_uso	id_usuario	int	NO	NULL	MUL	
+sesiones_uso	inicio	datetime	NO	NULL		
+sesiones_uso	fin	datetime	NO	NULL		
+sesiones_uso	duracion_segundos	int unsigned	NO	0		
+tiempos_actividad	id	bigint	NO	NULL	PRI	auto_increment
+tiempos_actividad	id_usuario	int	NO	NULL	MUL	
+tiempos_actividad	titulo	varchar(200)	NO	NULL		
+tiempos_actividad	categoria	varchar(50)	NO	NULL		
+tiempos_actividad	duracion_segundos	int unsigned	NO	0		
+tiempos_actividad	fecha_hora	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+tipo_actividad	id_tipo_actividad	int	NO	NULL	PRI	auto_increment
+tipo_actividad	nombre	varchar(50)	NO	NULL	UNI	
+tipo_actividad	descripcion	text	YES	NULL		
+tipo_cuidador	id_tipo_cuidador	int	NO	NULL	PRI	auto_increment
+tipo_cuidador	nombre	varchar(80)	NO	NULL	UNI	
+tipo_cuidador	descripcion	text	YES	NULL		
+tratamiento	id	int	NO	NULL	PRI	auto_increment
+tratamiento	id_adulto	int	NO	NULL	MUL	
+tratamiento	id_medicamento	int	NO	NULL	MUL	
+tratamiento	id_cuidador	int	YES	NULL	MUL	
+tratamiento	dosis	varchar(100)	NO	NULL		
+tratamiento	frecuencia	varchar(100)	NO	NULL		
+tratamiento	fecha_inicio	date	YES	NULL		
+tratamiento	fecha_fin	date	YES	NULL		
+tratamiento	activo	tinyint(1)	NO	1		
+usuarios	id	int	NO	NULL	PRI	auto_increment
+usuarios	nombre	varchar(150)	NO	NULL		
+usuarios	correo	varchar(254)	NO	NULL	UNI	
+usuarios	password_hash	varchar(255)	NO	NULL		
+usuarios	rol	enum('Administrador','Adulto Mayor','Cuidador','Familiar')	NO	NULL	MUL	
+usuarios	genero	varchar(30)	YES	NULL		
+usuarios	telefono	varchar(20)	YES	NULL		
+usuarios	ubicacion	varchar(200)	YES	NULL		
+usuarios	foto_perfil	varchar(500)	YES	NULL		
+usuarios	fecha_registro	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+vw_adherencia_medicacion	id_adulto	int	NO	0		
+vw_adherencia_medicacion	nombre_adulto	varchar(150)	NO	NULL		
+vw_adherencia_medicacion	medicamento	varchar(150)	NO	NULL		
+vw_adherencia_medicacion	id_tratamiento	int	NO	0		
+vw_adherencia_medicacion	tomas_totales	bigint	NO	0		
+vw_adherencia_medicacion	tomas_tomadas	decimal(23,0)	YES	NULL		
+vw_adherencia_medicacion	tomas_omitidas	decimal(23,0)	YES	NULL		
+vw_adherencia_medicacion	tomas_atrasadas	decimal(23,0)	YES	NULL		
+vw_adherencia_medicacion	tomas_programadas	decimal(23,0)	YES	NULL		
+vw_adherencia_medicacion	porcentaje_adherencia	decimal(29,2)	NO	0.00		
+vw_progreso	id_usuario	int	NO	0		
+vw_progreso	nombre_usuario	varchar(150)	NO	NULL		
+vw_progreso	puntos	decimal(32,0)	NO	0		
+vw_progreso	actividades_completadas	bigint	NO	0		
+vw_progreso	cognitivas_completadas	decimal(23,0)	YES	NULL		
+vw_progreso	fisicas_completadas	decimal(23,0)	YES	NULL		
+vw_progreso	ultima_actividad	datetime	YES	NULL		

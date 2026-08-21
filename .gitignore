@@ -3,7 +3,6 @@
 
 # Datos locales y cachés de Python
 *.db
-*.sqlite3
 __pycache__/
 *.py[cod]
 .pytest_cache/

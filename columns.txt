@@ -1,0 +1,192 @@
+TABLE_NAME	COLUMN_NAME	COLUMN_TYPE	IS_NULLABLE	COLUMN_KEY
+actividad	id	int	NO	PRI
+actividad	nombre	varchar(160)	NO	
+actividad	descripcion	text	YES	
+actividad	nivel	tinyint unsigned	NO	
+actividad	impacto	varchar(30)	YES	
+actividad	activa	tinyint(1)	NO	
+actividad	id_tipo_actividad	int	NO	MUL
+adulto_alergia	id_adulto	int	NO	PRI
+adulto_alergia	id_alergia	int	NO	PRI
+adulto_alergia	observaciones	varchar(255)	YES	
+adulto_antecedente	id_adulto	int	NO	PRI
+adulto_antecedente	id_antecedente	int	NO	PRI
+adulto_antecedente	observaciones	varchar(255)	YES	
+adulto_dificultad	id_adulto	int	NO	PRI
+adulto_dificultad	id_dificultad	int	NO	PRI
+adulto_dificultad	nivel	varchar(50)	YES	
+adulto_habito	id_adulto	int	NO	PRI
+adulto_habito	id_habito	int	NO	PRI
+adulto_habito	frecuencia	varchar(80)	YES	
+adulto_mayor	id	int	NO	PRI
+adulto_mayor	id_usuario	int	NO	UNI
+adulto_mayor	fecha_nacimiento	date	YES	
+adulto_mayor	descripcion_movilidad	text	YES	
+adulto_mayor	perfil_medico	text	YES	
+adulto_mayor	descripcion_habitos	text	YES	
+adulto_mayor	imc	decimal(5,2)	YES	
+alergia	id	int	NO	PRI
+alergia	nombre	varchar(120)	NO	UNI
+alergia	descripcion	text	YES	
+antecedente_medico	id	int	NO	PRI
+antecedente_medico	nombre	varchar(150)	NO	UNI
+antecedente_medico	descripcion	text	YES	
+auditoria	id	int	NO	PRI
+auditoria	accion	varchar(100)	NO	
+auditoria	detalle	text	YES	
+auditoria	id_admin	int	YES	MUL
+auditoria	fecha_hora	datetime	NO	MUL
+contacto_emergencia	id	int	NO	PRI
+contacto_emergencia	id_adulto	int	NO	MUL
+contacto_emergencia	nombre	varchar(150)	NO	
+contacto_emergencia	telefono	varchar(20)	NO	
+contacto_emergencia	relacion	varchar(80)	YES	
+cuidador	id	int	NO	PRI
+cuidador	id_usuario	int	NO	UNI
+cuidador	cedula_medica	varchar(80)	YES	UNI
+cuidador	especialidad	varchar(120)	YES	
+cuidador	id_tipo_cuidador	int	YES	MUL
+dieta_adulto	id	int	NO	PRI
+dieta_adulto	id_adulto	int	NO	MUL
+dieta_adulto	tipo_dieta	varchar(100)	YES	
+dieta_adulto	descripcion	text	YES	
+dieta_adulto	fecha_inicio	date	YES	
+dieta_adulto	fecha_fin	date	YES	
+dieta_adulto	activa	tinyint(1)	NO	
+dificultad_cognitiva	id	int	NO	PRI
+dificultad_cognitiva	nombre	varchar(120)	NO	UNI
+dificultad_cognitiva	descripcion	text	YES	
+estado_toma	id_estado	int	NO	PRI
+estado_toma	nombre	varchar(50)	NO	UNI
+estado_toma	descripcion	text	YES	
+familiar	id	int	NO	PRI
+familiar	id_usuario	int	NO	UNI
+habito	id	int	NO	PRI
+habito	nombre	varchar(120)	NO	UNI
+habito	descripcion	text	YES	
+habito	categoria	varchar(60)	YES	
+logro	id	int	NO	PRI
+logro	codigo	varchar(50)	NO	UNI
+logro	nombre	varchar(120)	NO	
+logro	descripcion	text	YES	
+logro	puntos	int	NO	
+logros_usuario	id	int	NO	PRI
+logros_usuario	id_usuario	int	NO	UNI
+logros_usuario	desbloqueado_en	datetime	NO	
+logros_usuario	id_logro	int	NO	
+medicamento	id	int	NO	PRI
+medicamento	nombre	varchar(150)	NO	MUL
+medicamento	presentacion	varchar(120)	YES	
+medicamento	indicaciones	text	YES	
+metrica_biometrica	id	int	NO	PRI
+metrica_biometrica	id_adulto	int	NO	MUL
+metrica_biometrica	tipo	varchar(80)	NO	
+metrica_biometrica	valor	decimal(10,2)	NO	
+metrica_biometrica	unidad	varchar(30)	YES	
+metrica_biometrica	fecha_hora	datetime	NO	
+notificacion	id	int	NO	PRI
+notificacion	id_usuario	int	NO	MUL
+notificacion	id_registro_toma	int	YES	MUL
+notificacion	tipo	varchar(50)	NO	
+notificacion	mensaje	text	NO	
+notificacion	fecha_programada	datetime	NO	
+notificacion	fecha_enviada	datetime	YES	
+notificacion	estado	enum('Pendiente','Enviado','Leido','Cancelado')	NO	
+preferencias_usuario	id_usuario	int	NO	PRI
+preferencias_usuario	preferencias	json	NO	
+preferencias_usuario	actualizado_en	datetime	NO	
+progreso	id_usuario	int	NO	PRI
+progreso	puntos	int	NO	
+progreso	racha_dias	int	NO	
+progreso	actividades_completadas	int	NO	
+progreso	cognitivas_completadas	int	NO	
+progreso	ultima_actividad	datetime	YES	
+publicaciones	id	int	NO	PRI
+publicaciones	id_autor	int	NO	MUL
+publicaciones	contenido	text	NO	
+publicaciones	fecha_hora	datetime	NO	
+publicaciones	estado	enum('visible','oculta','eliminada')	NO	MUL
+registro_actividad	id	int	NO	PRI
+registro_actividad	id_usuario	int	NO	MUL
+registro_actividad	id_actividad	int	YES	MUL
+registro_actividad	fecha	datetime	NO	
+registro_actividad	hora_inicio	datetime	YES	
+registro_actividad	hora_fin	datetime	YES	
+registro_actividad	nivel_alcanzado	tinyint	YES	
+registro_actividad	desempeno	varchar(50)	YES	
+registro_actividad	puntos	int	NO	
+registro_actividad	observaciones	text	YES	
+registro_sueno	id	int	NO	PRI
+registro_sueno	id_adulto	int	NO	MUL
+registro_sueno	fecha	date	NO	
+registro_sueno	hora_inicio	time	YES	
+registro_sueno	hora_fin	time	YES	
+registro_sueno	duracion_minutos	int	YES	
+registro_sueno	calidad	varchar(50)	YES	
+registro_sueno	observaciones	text	YES	
+registro_toma	id	int	NO	PRI
+registro_toma	id_tratamiento	int	NO	MUL
+registro_toma	fecha_hora	datetime	NO	
+registro_toma	hora_programada	time	YES	
+registro_toma	hora_real	datetime	YES	
+registro_toma	observaciones	varchar(255)	YES	
+registro_toma	id_estado	int	NO	MUL
+relaciones_familiar	id	int	NO	PRI
+relaciones_familiar	id_familiar	int	NO	MUL
+relaciones_familiar	id_adulto	int	NO	MUL
+relaciones_familiar	tipo_relacion	varchar(80)	YES	
+relaciones_familiar	autorizado	tinyint(1)	NO	
+relaciones_familiar	fecha_vinculo	datetime	NO	
+sesiones_uso	id	bigint	NO	PRI
+sesiones_uso	id_usuario	int	NO	MUL
+sesiones_uso	inicio	datetime	NO	
+sesiones_uso	fin	datetime	NO	
+sesiones_uso	duracion_segundos	int unsigned	NO	
+tiempos_actividad	id	bigint	NO	PRI
+tiempos_actividad	id_usuario	int	NO	MUL
+tiempos_actividad	titulo	varchar(200)	NO	
+tiempos_actividad	categoria	varchar(50)	NO	
+tiempos_actividad	duracion_segundos	int unsigned	NO	
+tiempos_actividad	fecha_hora	datetime	NO	
+tipo_actividad	id_tipo_actividad	int	NO	PRI
+tipo_actividad	nombre	varchar(50)	NO	UNI
+tipo_actividad	descripcion	text	YES	
+tipo_cuidador	id_tipo_cuidador	int	NO	PRI
+tipo_cuidador	nombre	varchar(80)	NO	UNI
+tipo_cuidador	descripcion	text	YES	
+tratamiento	id	int	NO	PRI
+tratamiento	id_adulto	int	NO	MUL
+tratamiento	id_medicamento	int	NO	MUL
+tratamiento	id_cuidador	int	YES	MUL
+tratamiento	dosis	varchar(100)	NO	
+tratamiento	frecuencia	varchar(100)	NO	
+tratamiento	fecha_inicio	date	YES	
+tratamiento	fecha_fin	date	YES	
+tratamiento	activo	tinyint(1)	NO	
+usuarios	id	int	NO	PRI
+usuarios	nombre	varchar(150)	NO	
+usuarios	correo	varchar(254)	NO	UNI
+usuarios	password_hash	varchar(255)	NO	
+usuarios	rol	enum('Administrador','Adulto Mayor','Cuidador','Familiar')	NO	MUL
+usuarios	genero	varchar(30)	YES	
+usuarios	telefono	varchar(20)	YES	
+usuarios	ubicacion	varchar(200)	YES	
+usuarios	foto_perfil	varchar(500)	YES	
+usuarios	fecha_registro	datetime	NO	
+vw_adherencia_medicacion	id_adulto	int	NO	
+vw_adherencia_medicacion	nombre_adulto	varchar(150)	NO	
+vw_adherencia_medicacion	medicamento	varchar(150)	NO	
+vw_adherencia_medicacion	id_tratamiento	int	NO	
+vw_adherencia_medicacion	tomas_totales	bigint	NO	
+vw_adherencia_medicacion	tomas_tomadas	decimal(23,0)	YES	
+vw_adherencia_medicacion	tomas_omitidas	decimal(23,0)	YES	
+vw_adherencia_medicacion	tomas_atrasadas	decimal(23,0)	YES	
+vw_adherencia_medicacion	tomas_programadas	decimal(23,0)	YES	
+vw_adherencia_medicacion	porcentaje_adherencia	decimal(29,2)	NO	
+vw_progreso	id_usuario	int	NO	
+vw_progreso	nombre_usuario	varchar(150)	NO	
+vw_progreso	puntos	decimal(32,0)	NO	
+vw_progreso	actividades_completadas	bigint	NO	
+vw_progreso	cognitivas_completadas	decimal(23,0)	YES	
+vw_progreso	fisicas_completadas	decimal(23,0)	YES	
+vw_progreso	ultima_actividad	datetime	YES	

@@ -32,9 +32,10 @@ class AuthService:
         })
 
         extra = {k: datos.get(k) for k in (
-            "limitaciones_movilidad", "perfil_medico", "alergias", "imc",
-            "nivel_movilidad", "dificultades_cognitivas", "cedula_medica",
-            "id_adulto_vinculado", "acepto_privacidad", "creado_por",
+            "descripcion_movilidad", "perfil_medico", "alergias", "imc",
+            "dificultades_cognitivas", "antecedentes_medicos", "cedula_medica", "tipo_cuidador", "especialidad",
+            "descripcion_habitos", "dieta", "sueño", "id_adulto_vinculado", "tipo_relacion", "acepto_privacidad", "creado_por",
+            "genero", "telefono", "ubicacion", "foto_perfil", "fecha_nacimiento"
         )}
         if self._repo.guardar_usuario(usuario, extra):
             if datos.get("id_familiar_vincular") and usuario.id:

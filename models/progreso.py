@@ -139,9 +139,8 @@ class ReporteCuidador(Reporte):
         extra = ""
         if isinstance(usuario, AdultoMayor):
             extra = (
-                f"\n• Movilidad: {usuario.nivel_movilidad}"
+                f"\n• Movilidad: {usuario.descripcion_movilidad}"
                 f"\n• IMC: {usuario.imc}"
-                f"\n• Limitaciones: {usuario.limitaciones_movilidad}"
             )
         return (
             f"Expediente clínico-resumen — {usuario.nombre}\n"

@@ -207,11 +207,11 @@ class AdaptadorEjercicios:
         return set(normalizado.replace(",", " ").replace("/", " ").split())
 
     @classmethod
-    def filtrar_fisicos(cls, limitaciones: str, nivel_movilidad: str):
+    def filtrar_fisicos(cls, descripcion_movilidad: str):
         from core.messages import MensajeMITA
 
-        palabras = cls._palabras(limitaciones)
-        movilidad_baja = cls._palabras(nivel_movilidad) & {"reducida", "baja", "limitada"}
+        palabras = cls._palabras(descripcion_movilidad)
+        movilidad_baja = palabras & {"reducida", "baja", "limitada"}
         zonas_excluidas: set[str] = set()
         if palabras & {"rodilla", "rodillas", "pierna", "piernas", "cadera", "caminar", "movilidad"}:
             zonas_excluidas |= {"rodillas", "piernas", "caminar", "equilibrio", "sentarse", "tobillos"}

@@ -36,7 +36,7 @@ class ActivityFilterService:
         preferencias = self._preference_repo.obtener(usuario_id)
 
         # Obtener limitaciones de movimiento
-        limitaciones_movilidad = preferencias.get("limitaciones_movilidad", "").lower()
+        descripcion_movilidad = preferencias.get("descripcion_movilidad", "").lower()
 
         # Obtener dificultades cognitivas
         dificultades_cognitivas = preferencias.get("dificultades_cognitivas", "").lower()
@@ -49,7 +49,7 @@ class ActivityFilterService:
         for actividad in actividades:
             if self._puede_realizar_actividad(
                 actividad,
-                limitaciones_movilidad,
+                descripcion_movilidad,
                 dificultades_cognitivas,
                 actividades_excluidas
             ):
@@ -60,7 +60,7 @@ class ActivityFilterService:
     def _puede_realizar_actividad(
         self,
         actividad: Actividad,
-        limitaciones_movilidad: str,
+        descripcion_movilidad: str,
         dificultades_cognitivas: str,
         actividades_excluidas: List[str]
     ) -> bool:
@@ -75,29 +75,28 @@ class ActivityFilterService:
             return False
 
         # Filtrar por limitaciones de movimiento
-        if limitaciones_movilidad and limitaciones_movilidad != "ninguna":
+        if descripcion_movilidad and descripcion_movilidad != "ninguna":
             actividad_tipo = getattr(actividad, 'tipo', '').lower()
             actividad_categoria = getattr(actividad, 'categoria', '').lower()
             actividad_etiquetas = [etq.lower() for etq in getattr(actividad, 'etiquetas', [])]
 
-            # Palabras clave que indican actividades que podrían ser problemáticas
-            palabras_movilidad = ['caminar', 'correr', 'saltar', 'equilibrio', 'piernas',
-                                'rodillas', 'pies', 'pies', 'bailar', 'pasos']
-
             # Check if activity involves restricted movements
             texto_actividad = f"{actividad_tipo} {actividad_categoria} {' '.join(actividad_etiquetas)}".lower()
 
-            if 'rodilla' in limitaciones_movilidad:
-                if any(palabra in texto_actividad for palabra in ['rodilla', 'sentadilla', 'flexión', 'estocada']):
-                    return False
+            zonas_afectadas: Set[str] = set()
 
-            if 'espalda' in limitaciones_movilidad:
-                if any(palabra in texto_actividad for palabra in ['flexión', 'torsión', 'peso', 'levantamiento']):
-                    return False
+            # Mapeo de términos comunes a zonas
+            if 'rodilla' in descripcion_movilidad:
+                zonas_afectadas.update(["rodillas", "piernas", "equilibrio", "sentarse"])
+                
+            if 'espalda' in descripcion_movilidad:
+                zonas_afectadas.update(["espalda", "giros", "inclinacion"])
+                
+            if 'cadera' in descripcion_movilidad:
+                zonas_afectadas.update(["cadera", "equilibrio", "caminar", "piernas"])
 
-            if 'cadera' in limitaciones_movilidad:
-                if any(palabra in texto_actividad for palabra in ['cadera', 'rotación', 'lateral']):
-                    return False
+            if any(zona in texto_actividad for zona in zonas_afectadas):
+                return False
 
         # Filtrar por dificultades cognitivas
         if dificultades_cognitivas and dificultades_cognitivas != "ninguna":
@@ -153,7 +152,7 @@ class ActivityFilterService:
     def guardar_limitaciones_usuario(
         self,
         usuario_id: int,
-        limitaciones_movilidad: str = "",
+        descripcion_movilidad: str = "",
         dificultades_cognitivas: str = "",
         actividades_excluidas: List[str] = None
     ) -> bool:
@@ -163,11 +162,17 @@ class ActivityFilterService:
             actividades_excluidas = []
 
         preferencias_actuales = self._preference_repo.obtener(usuario_id)
-        preferencias_actuales.update({
-            "limitaciones_movilidad": limitaciones_movilidad.strip(),
+        
+        actualizaciones = {
+            "descripcion_movilidad": descripcion_movilidad.strip(),
             "dificultades_cognitivas": dificultades_cognitivas.strip(),
-            "actividades_excluidas": [act.strip().lower() for act in actividades_excluidas if act.strip()]
-        })
+            "actividades_excluidas": [a.lower().strip() for a in (actividades_excluidas or []) if a.strip()]
+        }
+        
+        # Eliminar campos vacíos si no están explícitamente configurados
+        actualizaciones = {k: v for k, v in actualizaciones.items() if v}
+        
+        preferencias_actuales.update(actualizaciones)
 
         return self._preference_repo.guardar(usuario_id, preferencias_actuales)
 

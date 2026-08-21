@@ -12,6 +12,10 @@ class Usuario(ABC):
         correo: str,
         password_hash: str,
         rol: str,
+        genero: Optional[str] = None,
+        telefono: Optional[str] = None,
+        ubicacion: Optional[str] = None,
+        foto_perfil: Optional[str] = None,
         user_id: Optional[int] = None,
     ) -> None:
         self._id = user_id
@@ -19,6 +23,10 @@ class Usuario(ABC):
         self._correo = correo
         self._password_hash = password_hash
         self._rol = rol
+        self._genero = genero
+        self._telefono = telefono
+        self._ubicacion = ubicacion
+        self._foto_perfil = foto_perfil
 
     @property
     def id(self) -> Optional[int]:
@@ -44,6 +52,26 @@ class Usuario(ABC):
     def rol(self) -> str:
         return self._rol
 
+    @property
+    def genero(self) -> Optional[str]:
+        return self._genero
+
+    @property
+    def telefono(self) -> Optional[str]:
+        return self._telefono
+
+    @property
+    def ubicacion(self) -> Optional[str]:
+        return self._ubicacion
+
+    @property
+    def foto_perfil(self) -> Optional[str]:
+        return self._foto_perfil
+
+    @foto_perfil.setter
+    def foto_perfil(self, val: Optional[str]) -> None:
+        self._foto_perfil = val
+
     @abstractmethod
     def panel_destino(self) -> str:
         """Ruta del panel según rol (polimorfismo)."""
@@ -57,35 +85,55 @@ class AdultoMayor(Usuario):
         nombre: str,
         correo: str,
         password_hash: str,
-        limitaciones: str = "Ninguna",
+        descripcion_movilidad: str = "",
         perfil_medico: str = "Condición estable",
+        descripcion_habitos: str = "",
         alergias: str = "Ninguna",
         imc: float = 22.0,
-        nivel_movilidad: str = "Normal",
         dificultades_cognitivas: str = "Ninguna",
+        fecha_nacimiento: Optional[str] = None,
+        genero: Optional[str] = None,
+        telefono: Optional[str] = None,
+        ubicacion: Optional[str] = None,
+        foto_perfil: Optional[str] = None,
         user_id: Optional[int] = None,
     ) -> None:
-        super().__init__(nombre, correo, password_hash, "Adulto Mayor", user_id)
-        self._limitaciones_movilidad = limitaciones
+        super().__init__(nombre, correo, password_hash, "Adulto Mayor", genero, telefono, ubicacion, foto_perfil, user_id)
+        self._descripcion_movilidad = descripcion_movilidad
         self._perfil_medico = perfil_medico
+        self._descripcion_habitos = descripcion_habitos
         self._alergias = alergias
         self._imc = imc
-        self._nivel_movilidad = nivel_movilidad
         self._dificultades_cognitivas = dificultades_cognitivas
+        self._fecha_nacimiento = fecha_nacimiento
 
     @property
-    def limitaciones_movilidad(self) -> str:
-        return self._limitaciones_movilidad
+    def fecha_nacimiento(self) -> Optional[str]:
+        return self._fecha_nacimiento
 
-    @limitaciones_movilidad.setter
-    def limitaciones_movilidad(self, val: str) -> None:
-        if not val.strip():
-            raise ValueError("Las limitaciones no pueden estar vacías")
-        self._limitaciones_movilidad = val
+    @property
+    def descripcion_movilidad(self) -> str:
+        return self._descripcion_movilidad
+
+    @descripcion_movilidad.setter
+    def descripcion_movilidad(self, val: str) -> None:
+        self._descripcion_movilidad = val
 
     @property
     def perfil_medico(self) -> str:
         return self._perfil_medico
+
+    @property
+    def descripcion_habitos(self) -> str:
+        return self._descripcion_habitos
+
+    @property
+    def dieta(self) -> str:
+        return self._dieta
+
+    @property
+    def sueno(self) -> str:
+        return self._sueno
 
     @property
     def alergias(self) -> str:
@@ -100,10 +148,6 @@ class AdultoMayor(Usuario):
         if val <= 0 or val > 80:
             raise ValueError("IMC fuera de rango válido")
         self._imc = val
-
-    @property
-    def nivel_movilidad(self) -> str:
-        return self._nivel_movilidad
 
     @property
     def dificultades_cognitivas(self) -> str:
@@ -122,9 +166,13 @@ class Familiar(Usuario):
         correo: str,
         password_hash: str,
         id_adulto_vinculado: Optional[int] = None,
+        genero: Optional[str] = None,
+        telefono: Optional[str] = None,
+        ubicacion: Optional[str] = None,
+        foto_perfil: Optional[str] = None,
         user_id: Optional[int] = None,
     ) -> None:
-        super().__init__(nombre, correo, password_hash, "Familiar", user_id)
+        super().__init__(nombre, correo, password_hash, "Familiar", genero, telefono, ubicacion, foto_perfil, user_id)
         self._id_adulto_vinculado = id_adulto_vinculado
 
     @property
@@ -144,14 +192,24 @@ class Cuidador(Usuario):
         correo: str,
         password_hash: str,
         cedula_medica: str = "MED-0000",
+        tipo_cuidador: str = "",
+        genero: Optional[str] = None,
+        telefono: Optional[str] = None,
+        ubicacion: Optional[str] = None,
+        foto_perfil: Optional[str] = None,
         user_id: Optional[int] = None,
     ) -> None:
-        super().__init__(nombre, correo, password_hash, "Cuidador", user_id)
+        super().__init__(nombre, correo, password_hash, "Cuidador", genero, telefono, ubicacion, foto_perfil, user_id)
         self._cedula_medica = cedula_medica
+        self._tipo_cuidador = tipo_cuidador
 
     @property
     def cedula_medica(self) -> str:
         return self._cedula_medica
+
+    @property
+    def tipo_cuidador(self) -> str:
+        return self._tipo_cuidador
 
     def panel_destino(self) -> str:
         return "cuidador"
@@ -165,9 +223,13 @@ class Administrador(Usuario):
         nombre: str,
         correo: str,
         password_hash: str,
+        genero: Optional[str] = None,
+        telefono: Optional[str] = None,
+        ubicacion: Optional[str] = None,
+        foto_perfil: Optional[str] = None,
         user_id: Optional[int] = None,
     ) -> None:
-        super().__init__(nombre, correo, password_hash, "Administrador", user_id)
+        super().__init__(nombre, correo, password_hash, "Administrador", genero, telefono, ubicacion, foto_perfil, user_id)
 
     def panel_destino(self) -> str:
         return "admin"
@@ -183,30 +245,55 @@ class UsuarioFactory:
         uid = datos.get("id")
         nombre = datos["nombre"]
         correo = datos["correo"]
+        genero = datos.get("genero")
+        telefono = datos.get("telefono")
+        ubicacion = datos.get("ubicacion")
+        foto_perfil = datos.get("foto_perfil")
 
         if rol == "Adulto Mayor":
             return AdultoMayor(
                 nombre, correo, pwd,
-                limitaciones=datos.get("limitaciones_movilidad", "Ninguna"),
+                descripcion_movilidad=datos.get("descripcion_movilidad", ""),
                 perfil_medico=datos.get("perfil_medico", "Condición estable"),
+                descripcion_habitos=datos.get("descripcion_habitos", ""),
                 alergias=datos.get("alergias", "Ninguna"),
                 imc=float(datos.get("imc", 22.0)),
-                nivel_movilidad=datos.get("nivel_movilidad", "Normal"),
                 dificultades_cognitivas=datos.get("dificultades_cognitivas", "Ninguna"),
+                fecha_nacimiento=datos.get("fecha_nacimiento"),
+                genero=genero,
+                telefono=telefono,
+                ubicacion=ubicacion,
+                foto_perfil=foto_perfil,
                 user_id=uid,
             )
         if rol == "Familiar":
             return Familiar(
                 nombre, correo, pwd,
                 id_adulto_vinculado=datos.get("id_adulto_vinculado"),
+                genero=genero,
+                telefono=telefono,
+                ubicacion=ubicacion,
+                foto_perfil=foto_perfil,
                 user_id=uid,
             )
         if rol in ("Cuidador", "Médico"):
             return Cuidador(
                 nombre, correo, pwd,
                 cedula_medica=datos.get("cedula_medica", "MED-0000"),
+                tipo_cuidador=datos.get("tipo_cuidador", ""),
+                genero=genero,
+                telefono=telefono,
+                ubicacion=ubicacion,
+                foto_perfil=foto_perfil,
                 user_id=uid,
             )
         if rol == "Administrador":
-            return Administrador(nombre, correo, pwd, user_id=uid)
+            return Administrador(
+                nombre, correo, pwd,
+                genero=genero,
+                telefono=telefono,
+                ubicacion=ubicacion,
+                foto_perfil=foto_perfil,
+                user_id=uid
+            )
         return AdultoMayor(nombre, correo, pwd, user_id=uid)

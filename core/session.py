@@ -51,8 +51,8 @@ class SessionManager:
             "rol": usuario.rol,
         }
         for campo in (
-            "limitaciones_movilidad", "perfil_medico", "alergias", "imc",
-            "nivel_movilidad", "dificultades_cognitivas", "cedula_medica",
+            "descripcion_movilidad", "perfil_medico", "alergias", "imc",
+            "dificultades_cognitivas", "cedula_medica",
             "id_adulto_vinculado",
         ):
             if hasattr(usuario, campo):

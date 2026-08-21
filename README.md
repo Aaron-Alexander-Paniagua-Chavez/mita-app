@@ -134,7 +134,7 @@ MONGO_DATABASE=mita_analytics
 ### Configuración de Google Gemini (opcional)
 ```
 GEMINI_API_KEY=tu_api_key_de_google_aqui
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
 ### Configuración de MQTT (opcional)
@@ -143,7 +143,11 @@ MQTT_HOST=tu_broker_mqtt
 MQTT_PORT=8883
 MQTT_TOPIC=mita/chat
 MQTT_TLS=1
+MQTT_USERNAME=usuario_del_broker
+MQTT_PASSWORD=contraseña_del_broker
 ```
+
+Para comunicación entre redes, configure un broker propio accesible por Internet con TLS y autenticación. En una red local confiable se puede usar Mosquitto con `MQTT_TLS=0`. MITA no se conecta a brokers públicos anónimos.
 
 ### Otras opciones
 ```
@@ -230,9 +234,9 @@ El sistema de chat utiliza MQTT para comunicación en tiempo real:
 - Cuando hay Internet disponible y se configura un broker remoto, se usa ese
 - Cuando solo hay red local, se puede usar un broker local (ej: Mosquitto en la misma red)
 - Si no hay conexión MQTT disponible, el chat se desactiva gracefully
-- No se garantiza la privacidad en brokers públicos; se recomienda usar brokers locales o seguros
+- Se requiere un broker configurado; MITA no utiliza brokers públicos anónimos
 - La aplicación no envía información clínica mediante el chat
-- Los roles de usuario determinan quién puede participar en conversaciones
+- Todos los roles autenticados pueden participar en el canal general de mensajes
 
 ## Personalización y accesibilidad
 

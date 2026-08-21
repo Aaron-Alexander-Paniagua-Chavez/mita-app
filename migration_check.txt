@@ -1,0 +1,31 @@
+info	value
+Checking for old columns to remove:	
+  actividad.tipo: 	NOT FOUND (OK)
+  registro_toma.estado: 	NOT FOUND (OK)
+  cuidador.tipo_cuidador: 	NOT FOUND (OK)
+  adulto_mayor.dieta: 	NOT FOUND (OK)
+  adulto_mayor.sueno: 	NOT FOUND (OK)
+  logros_usuario.id_logro (VARCHAR): 	NOT FOUND (OK)
+	
+Checking for required tables:	
+  estado_toma: 	EXISTS (OK)
+  tipo_actividad: 	EXISTS (OK)
+  registro_actividad: 	EXISTS (OK)
+  notificacion: 	EXISTS (OK)
+  familiar: 	EXISTS (OK)
+  tipo_cuidador: 	EXISTS (OK)
+  dieta_adulto: 	EXISTS (OK)
+  registro_sueno: 	EXISTS (OK)
+  logro: 	EXISTS (OK)
+	
+Checking foreign key constraints:	
+  actividad -> tipo_actividad: 	OK (no orphaned)
+  registro_toma -> estado_toma: 	OK (no orphaned)
+  cuidador -> tipo_cuidador: 	OK (no orphaned)
+  logros_usuario -> logro: 	OK (no orphaned)
+  relaciones_familiar -> familiar: 	OK (no orphaned)
+  relaciones_familiar -> adulto_mayor: 	OK (no orphaned)
+	
+Checking data migration:	
+  registro_toma has non-null id_estado: 	OK
+  actividad has valid id_tipo_actividad (1 or 2): 	OK

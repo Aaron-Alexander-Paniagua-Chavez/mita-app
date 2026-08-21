@@ -33,10 +33,11 @@ class ComponenteUI:
 
     _acento = ACCENT_GREEN
     _acento_hover = ACCENT_GREEN_LIGHT
+    _tema_activo = "clasico"
 
     @classmethod
     def establecer_tema(cls, tema: str) -> None:
-        """Acentos adicionales conservando los modos claro/oscuro de MITA."""
+        """Actualiza los colores para widgets nuevos y los componentes reutilizables."""
         temas = {
             "clasico": (ACCENT_GREEN, ACCENT_GREEN_LIGHT),
             "oceano": (("#226A8A", "#68BDE0"), ("#18526B", "#4A9ABF")),
@@ -44,6 +45,19 @@ class ComponenteUI:
             "calido": (("#A85A3B", "#E09B7A"), ("#80432B", "#BF7659")),
         }
         cls._acento, cls._acento_hover = temas.get(tema, temas["clasico"])
+        cls._tema_activo = tema if tema in temas else "clasico"
+        # CustomTkinter toma estos valores al crear los controles. La pantalla
+        # se redibuja desde la app al elegir un tema, por lo que también se
+        # actualizan botones, menús y controles creados directamente.
+        paleta = ctk.ThemeManager.theme
+        paleta["CTkButton"]["fg_color"] = list(cls._acento)
+        paleta["CTkButton"]["hover_color"] = list(cls._acento_hover)
+        paleta["CTkOptionMenu"]["fg_color"] = list(cls._acento)
+        paleta["CTkOptionMenu"]["button_color"] = list(cls._acento_hover)
+        paleta["CTkOptionMenu"]["button_hover_color"] = list(cls._acento_hover)
+        paleta["CTkCheckBox"]["fg_color"] = list(cls._acento)
+        paleta["CTkCheckBox"]["hover_color"] = list(cls._acento_hover)
+        paleta["CTkSwitch"]["progress_color"] = list(cls._acento)
 
     @staticmethod
     def fuente(tamano: int, bold: bool = False) -> ctk.CTkFont:
@@ -60,9 +74,9 @@ class ComponenteUI:
         color: Optional[str] = None,
     ) -> ctk.CTkButton:
         h = BUTTON_HEIGHT_LARGE if grande else BUTTON_HEIGHT
-        return ctk.CTkButton(
+        boton = ctk.CTkButton(
             parent,
-            text=texto,
+            text=traducir(texto),
             command=command,
             width=ancho or 320,
             height=h,
@@ -72,36 +86,44 @@ class ComponenteUI:
             font=ComponenteUI.fuente(FONT_SIZE_BUTTON, bold=True),
             text_color=WHITE,
         )
+        boton._mita_texto_origen = texto
+        return boton
 
     @staticmethod
     def entrada(parent, placeholder: str, ancho: int = 380, password: bool = False) -> ctk.CTkEntry:
-        return ctk.CTkEntry(
+        entrada = ctk.CTkEntry(
             parent,
-            placeholder_text=placeholder,
+            placeholder_text=traducir(placeholder),
             width=ancho,
             height=ENTRY_HEIGHT,
             corner_radius=10,
             font=ComponenteUI.fuente(FONT_SIZE_BODY),
             show="*" if password else "",
         )
+        entrada._mita_placeholder_origen = placeholder
+        return entrada
 
     @staticmethod
     def titulo(parent, texto: str, tamano: int = FONT_SIZE_TITLE) -> ctk.CTkLabel:
-        return ctk.CTkLabel(
+        etiqueta = ctk.CTkLabel(
             parent,
-            text=texto,
+            text=traducir(texto),
             font=ComponenteUI.fuente(tamano, bold=True),
             text_color=DARK_TEXT,
         )
+        etiqueta._mita_texto_origen = texto
+        return etiqueta
 
     @staticmethod
     def subtitulo(parent, texto: str) -> ctk.CTkLabel:
-        return ctk.CTkLabel(
+        etiqueta = ctk.CTkLabel(
             parent,
-            text=texto,
+            text=traducir(texto),
             font=ComponenteUI.fuente(FONT_SIZE_SUBTITLE),
             text_color=TEXT_GRAY,
         )
+        etiqueta._mita_texto_origen = texto
+        return etiqueta
 
 
 class LogoMITA(ctk.CTkFrame):
@@ -197,7 +219,7 @@ class GuiaVisual(ctk.CTkFrame):
             c.create_line(75, y + 45, 89, y + 74, fill=verde, width=5, capstyle="round")
         if self.movimiento == "respiracion":
             c.create_arc(105, y + 15, 137, y + 47, start=80, extent=200, style="arc", outline=terracota, width=3)
-        c.create_text(75, 106, text="Guía ilustrada", fill="#21574A", font=(FONT_FAMILY, 11, "bold"))
+        c.create_text(75, 106, text=traducir("Guía ilustrada"), fill="#21574A", font=(FONT_FAMILY, 11, "bold"))
 
     def _pulso(self) -> None:
         if not self.winfo_exists():
@@ -214,7 +236,7 @@ class NotificationService:
     def mostrar(parent, texto: str, es_error: bool = False, duracion: int = 3500) -> None:
         from config.settings import ERROR_COLOR
 
-        color = ERROR_COLOR if es_error else ACCENT_GREEN
+        color = ERROR_COLOR if es_error else ComponenteUI._acento
         toast = ctk.CTkFrame(parent, fg_color=color, corner_radius=10)
         toast.pack(side="top", fill="x", padx=16, pady=8)
         ctk.CTkLabel(

@@ -1,5 +1,6 @@
 """Aplicación principal MITA — roles, accesibilidad y modo híbrido."""
 from datetime import datetime
+import threading
 import tkinter as tk
 
 import customtkinter as ctk
@@ -35,10 +36,25 @@ from services.analytics_service import AnalyticsService
 from services.personalization_service import PersonalizationService
 from services.time_tracking_service import TimeTrackingService
 from services.activity_filter_service import ActivityFilterService
+from services.account_service import ServicioCuenta
+from services.chat_service import ClienteChatMITA
 from services.ia_service import AsistenteIA
+from core.security import GestorSeguridad
+from tkinter import filedialog
 from ui.components import ComponenteUI, LogoMITA, NotificationService
 from ui.i18n import IDIOMAS, establecer_idioma, idioma_actual, traducir
 from ui.views.role_views import VistaAdmin, VistaAdultoMayor, VistaCuidador, VistaFamiliar
+
+from repositories.actividad_repository import ActividadRepository
+from repositories.dieta_sueno_repository import DietaSuenoRepository
+from repositories.foto_repository import FotoRepository
+from repositories.medicamento_repository import MedicamentoRepository
+from repositories.notificacion_repository import NotificacionRepository
+
+from services.analisis_service import AnalisisService
+from services.dieta_sueno_service import DietaSuenoService
+from services.foto_service import FotoService
+from services.medicamento_service import MedicamentoService
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("green")
@@ -70,18 +86,36 @@ class MitaApp(ctk.CTk):
         self.preferencias_repo = PreferenciasRepository(self.db_service)
         self.registro_uso_repo = RegistroUsoRepository(self.db_service)
         self.auth_service = AuthService(self.user_repo)
+        self.cuenta_service = ServicioCuenta(self.user_repo, self.db_service)
         self.admin_service = AdministradorUsuarios(self.user_repo, self.db_service)
         self.comunidad_service = ComunidadService(self.comunidad_repo)
         self.permiso_service = PermisoSeguimiento(self.user_repo)
         self.analytics_service = AnalyticsService(self.estadistica_repo)
         self.personalization_service = PersonalizationService(self.preferencias_repo)
         self.activity_filter_service = ActivityFilterService(self.preferencias_repo)
+        self.actividad_repo = ActividadRepository(self.db_service)
+        self.dieta_sueno_repo = DietaSuenoRepository(self.db_service)
+        self.foto_repo = FotoRepository()
+        self.medicamento_repo = MedicamentoRepository(self.db_service)
+        self.notif_repo = NotificacionRepository(self.db_service)
+
+        self.foto_service = FotoService(self.foto_repo, self.user_repo)
+        self.medicamento_service = MedicamentoService(self.medicamento_repo, self.notif_repo)
+        self.dieta_sueno_service = DietaSuenoService(self.dieta_sueno_repo, self.user_repo)
+        self.analisis_service = AnalisisService(
+            self.user_repo, self.progreso_repo, self.medicamento_repo, self.dieta_sueno_repo, self.actividad_repo
+        )
+
         self.time_tracking_service = TimeTrackingService()
         self.ia_service = AsistenteIA()
         self.mongo_session_id = None
         self.sync_service = GestorSincronizacionLocal(self.db_service)
         self.gestor_progreso = GestorProgreso()
         self.sistema_logros = SistemaLogros()
+        self.chat_cliente = None
+        self._ventana_chat = None
+        self._historial_chat = []
+        self._ventana_ia = None
 
         # Vistas por rol
         self.vista_adulto = VistaAdultoMayor(self)
@@ -126,17 +160,19 @@ class MitaApp(ctk.CTk):
             barra, text="Accesibilidad", font=ComponenteUI.fuente(14, bold=True), text_color=DARK_TEXT,
         )
         self._texto_accesibilidad.pack(side="left", padx=(18, 8), pady=7)
-        ctk.CTkButton(
+        self._btn_texto_menos = ctk.CTkButton(
             barra, text="A−", width=42, height=32, command=lambda: self.ajustar_texto(-1),
-            font=ComponenteUI.fuente(16, bold=True), fg_color=ACCENT_GREEN,
-        ).pack(side="left", padx=2, pady=7)
-        ctk.CTkButton(
+            font=ComponenteUI.fuente(16, bold=True), fg_color=ComponenteUI._acento,
+        )
+        self._btn_texto_menos.pack(side="left", padx=2, pady=7)
+        self._btn_texto_mas = ctk.CTkButton(
             barra, text="A+", width=42, height=32, command=lambda: self.ajustar_texto(1),
-            font=ComponenteUI.fuente(16, bold=True), fg_color=ACCENT_GREEN,
-        ).pack(side="left", padx=2, pady=7)
+            font=ComponenteUI.fuente(16, bold=True), fg_color=ComponenteUI._acento,
+        )
+        self._btn_texto_mas.pack(side="left", padx=2, pady=7)
         self._switch_tema = ctk.CTkSwitch(
             barra, text="Modo oscuro", variable=self.tema_oscuro, command=self.cambiar_tema,
-            font=ComponenteUI.fuente(14), progress_color=ACCENT_GREEN,
+            font=ComponenteUI.fuente(14), progress_color=ComponenteUI._acento,
         )
         self._switch_tema.pack(side="left", padx=16, pady=7)
         self._estado_red = ctk.CTkLabel(
@@ -146,7 +182,7 @@ class MitaApp(ctk.CTk):
         self._btn_config = ctk.CTkButton(
             barra, text="⚙ Configuración", width=150, height=32,
             command=self.mostrar_configuracion_usuario, font=ComponenteUI.fuente(13),
-            fg_color="transparent", text_color=ACCENT_GREEN, hover_color=SOFT_GREEN,
+            fg_color="transparent", text_color=ComponenteUI._acento, hover_color=ComponenteUI._acento_hover,
         )
         self._btn_config.pack(side="left", padx=6)
         self._texto_idioma = ctk.CTkLabel(
@@ -155,16 +191,29 @@ class MitaApp(ctk.CTk):
         self._texto_idioma.pack(side="right", padx=(8, 4), pady=7)
         self._selector_idioma = ctk.CTkOptionMenu(
             barra, values=list(IDIOMAS.values()), command=self.cambiar_idioma,
-            width=150, height=32, font=ComponenteUI.fuente(14), fg_color=ACCENT_GREEN,
+            width=150, height=32, font=ComponenteUI.fuente(14), fg_color=ComponenteUI._acento,
         )
         self._selector_idioma.set(IDIOMAS[idioma_actual()])
         self._selector_idioma.pack(side="right", padx=(4, 18), pady=7)
+
+    def _actualizar_colores_barra(self) -> None:
+        """Actualiza los controles persistentes que no se recrean al cambiar tema."""
+        for boton in (self._btn_texto_menos, self._btn_texto_mas):
+            boton.configure(fg_color=ComponenteUI._acento, hover_color=ComponenteUI._acento_hover)
+        self._switch_tema.configure(progress_color=ComponenteUI._acento)
+        self._btn_config.configure(text_color=ComponenteUI._acento, hover_color=ComponenteUI._acento_hover)
+        self._selector_idioma.configure(
+            fg_color=ComponenteUI._acento,
+            button_color=ComponenteUI._acento_hover,
+            button_hover_color=ComponenteUI._acento_hover,
+        )
 
     def cambiar_tema(self) -> None:
         ctk.set_appearance_mode("dark" if self.tema_oscuro.get() else "light")
         usuario = SessionManager().usuario_actual
         if usuario and usuario.id:
             self.personalization_service.guardar(usuario.id, {"modo_oscuro": self.tema_oscuro.get()})
+        self._refrescar_vista_actual()
 
     def _aplicar_preferencias(self, usuario) -> None:
         if not usuario or not usuario.id:
@@ -174,8 +223,12 @@ class MitaApp(ctk.CTk):
         ctk.set_widget_scaling(self.font_scale)
         self.tema_personal = self.preferencias_usuario.get("tema", "clasico")
         ComponenteUI.establecer_tema(self.tema_personal)
+        self._actualizar_colores_barra()
         self.tema_oscuro.set(bool(self.preferencias_usuario.get("modo_oscuro", False)))
         ctk.set_appearance_mode("dark" if self.tema_oscuro.get() else "light")
+        establecer_idioma(self.preferencias_usuario.get("idioma", "es"))
+        self._selector_idioma.set(IDIOMAS[idioma_actual()])
+        self._actualizar_textos_barra()
 
     def _restaurar_ultima_sesion(self) -> None:
         usuario = SessionManager().restaurar_sesion(self.user_repo)
@@ -186,6 +239,7 @@ class MitaApp(ctk.CTk):
 
     def _activar_sesion(self, usuario, restaurada: bool = False) -> None:
         self._aplicar_preferencias(usuario)
+        self.ia_service.reiniciar_conversacion()
         self.time_tracking_service.iniciar_sesion()
         self._inicio_sesion_fecha = datetime.now()
         if not restaurada:
@@ -207,7 +261,7 @@ class MitaApp(ctk.CTk):
             return
         ventana = ctk.CTkToplevel(self)
         ventana.title("Configuración personal")
-        ventana.geometry("550x620")
+        ventana.geometry("550x700")
         ventana.transient(self)
         ventana.grab_set()
         ventana.configure(fg_color=BG_COLOR)
@@ -234,9 +288,9 @@ class MitaApp(ctk.CTk):
         ctk.CTkCheckBox(ventana, text="Animaciones suaves", variable=animaciones, font=ComponenteUI.fuente(14)).pack(anchor="w", padx=38, pady=4)
 
         # Sección de limitaciones de actividades
-        ctk.CTkLabel(ventana, text="Limitaciones de movimiento (ej: rodilla, espalda, cadera)", font=ComponenteUI.fuente(14, bold=True)).pack(anchor="w", padx=38, pady=(15, 2))
+        ctk.CTkLabel(ventana, text="Descripción de movilidad (ej: rodilla, espalda, cadera)", font=ComponenteUI.fuente(14, bold=True)).pack(anchor="w", padx=38, pady=(15, 2))
         limitaciones_entry = ctk.CTkEntry(ventana, placeholder_text="Ej: rodilla, espalda", ancho=420)
-        limitaciones_entry.insert(0, prefs.get("limitaciones_movilidad", ""))
+        limitaciones_entry.insert(0, prefs.get("descripcion_movilidad", ""))
         limitaciones_entry.pack(padx=38, pady=2)
 
         ctk.CTkLabel(ventana, text="Dificultades cognitivas (ej: memoria,alzheimer)", font=ComponenteUI.fuente(14, bold=True)).pack(anchor="w", padx=38, pady=(10, 2))
@@ -259,27 +313,349 @@ class MitaApp(ctk.CTk):
                 "tema": selector_tema.get(), "estilo_instrucciones": selector_estilo.get(),
                 "intereses": lista, "recordatorio_diario": recordatorio.get(),
                 "mantener_sesion": mantener.get(), "animaciones_suaves": animaciones.get(),
-                "limitaciones_movilidad": limitaciones,
+                "descripcion_movilidad": limitaciones,
                 "dificultades_cognitivas": dificultades,
                 "actividades_excluidas": excluidos
             })
             self.tema_personal = selector_tema.get()
             ComponenteUI.establecer_tema(self.tema_personal)
+            self._actualizar_colores_barra()
             if mantener.get():
                 SessionManager().guardar_sesion_persistente(usuario)
             else:
                 SessionManager().cerrar_sesion(borrar_persistida=True)
                 SessionManager().usuario_actual = usuario
             ventana.destroy()
+            self._refrescar_vista_actual()
             NotificationService.mostrar(self.main_container, "Configuración guardada.")
         ComponenteUI.boton(ventana, "Guardar preferencias", guardar, ancho=300).pack(pady=22)
+        ComponenteUI.boton(
+            ventana, "Editar mi información", lambda: self.mostrar_edicion_usuario(usuario.id), ancho=300,
+        ).pack(pady=(0, 8))
+        ComponenteUI.boton(
+            ventana, "Eliminar toda mi información", self.mostrar_confirmacion_eliminar_cuenta,
+            ancho=300, color=ERROR_COLOR,
+        ).pack(pady=(0, 8))
         ComponenteUI.boton(ventana, "Actualizar estado de red", self._actualizar_estado_red, ancho=300, color=TEXT_GRAY).pack(pady=(0, 16))
+
+    def mostrar_edicion_usuario(self, user_id: int) -> None:
+        """Permite corregir datos propios o gestionar perfiles con autorización."""
+        actor = SessionManager().usuario_actual
+        datos = self.user_repo.obtener_por_id(user_id)
+        if not actor or not datos:
+            NotificationService.mostrar(self.main_container, MensajeMITA.SIN_AUTORIZACION.value, es_error=True)
+            return
+        ventana = ctk.CTkToplevel(self)
+        ventana.title("Editar información")
+        ventana.geometry("620x700")
+        ventana.transient(self)
+        ventana.grab_set()
+        ventana.configure(fg_color=BG_COLOR)
+        ComponenteUI.titulo(ventana, f"Editar: {datos['nombre']}", 24).pack(pady=(16, 8))
+        scroll = ctk.CTkScrollableFrame(ventana, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=24, pady=8)
+        entradas = {}
+
+        def campo(etiqueta: str, clave: str, secreto: bool = False) -> None:
+            ctk.CTkLabel(scroll, text=etiqueta, font=ComponenteUI.fuente(14, bold=True)).pack(anchor="w", pady=(8, 2))
+            entrada = ComponenteUI.entrada(scroll, etiqueta, ancho=500, password=secreto)
+            if not secreto:
+                entrada.insert(0, str(datos.get(clave) or ""))
+            entrada.pack(fill="x")
+            entradas[clave] = entrada
+
+        campo("Nombre", "nombre")
+        campo("Correo", "correo")
+        campo("Nueva contraseña (opcional)", "password", secreto=True)
+        campo("Género", "genero")
+        campo("Teléfono", "telefono")
+        campo("Ubicación", "ubicacion")
+
+        # Sección de Foto de perfil
+        ctk.CTkLabel(scroll, text="Foto de Perfil", font=ComponenteUI.fuente(14, bold=True)).pack(anchor="w", pady=(8, 2))
+        lbl_foto_estado = ctk.CTkLabel(
+            scroll, 
+            text=f"Foto actual: {datos.get('foto_perfil') or 'Avatar predeterminado'}",
+            font=ComponenteUI.fuente(12),
+            text_color=TEXT_GRAY,
+            wraplength=480
+        )
+        lbl_foto_estado.pack(anchor="w")
+
+        def seleccionar_y_subir_foto():
+            ruta = filedialog.askopenfilename(
+                title="Seleccionar foto de perfil",
+                filetypes=[("Imágenes", "*.jpg *.jpeg *.png *.webp")]
+            )
+            if ruta:
+                ok, msj = self.foto_service.actualizar_foto_perfil(user_id, ruta)
+                NotificationService.mostrar(ventana, msj, es_error=not ok)
+                if ok:
+                    actualizado = self.user_repo.obtener_por_id(user_id)
+                    if actualizado:
+                        lbl_foto_estado.configure(text=f"Foto actual: {actualizado.get('foto_perfil')}")
+
+        def eliminar_foto():
+            ok, msj = self.foto_service.eliminar_foto_perfil(user_id)
+            NotificationService.mostrar(ventana, msj, es_error=not ok)
+            if ok:
+                lbl_foto_estado.configure(text="Foto actual: Avatar predeterminado")
+
+        btn_foto_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        btn_foto_frame.pack(fill="x", pady=4)
+        ComponenteUI.boton(btn_foto_frame, "📷 Seleccionar/Cambiar Foto", seleccionar_y_subir_foto, grande=False, ancho=220).pack(side="left", padx=(0, 6))
+        ComponenteUI.boton(btn_foto_frame, "🗑 Eliminar Foto", eliminar_foto, grande=False, ancho=140, color=ERROR_COLOR).pack(side="left")
+
+        if datos["rol"] == "Adulto Mayor":
+            campo("Fecha de nacimiento (AAAA-MM-DD)", "fecha_nacimiento")
+            for etiqueta, clave in (
+                ("Descripción de movilidad", "descripcion_movilidad"),
+                ("Alergias (separadas por coma)", "alergias"),
+                ("IMC", "imc"),
+                ("Dificultades cognitivas (separadas por coma)", "dificultades_cognitivas"),
+                ("Antecedentes médicos (separados por coma)", "antecedentes_medicos"),
+                ("Perfil médico (observaciones generales)", "perfil_medico"),
+            ):
+                campo(etiqueta, clave)
+            ctk.CTkLabel(scroll, text="Hábitos generales", font=ComponenteUI.fuente(14, bold=True)).pack(anchor="w", pady=(8, 2))
+            ctk.CTkLabel(
+                scroll, text="Describe solo de forma general tus hábitos. No incluyas diagnósticos, contraseñas ni datos sensibles.",
+                font=ComponenteUI.fuente(13), text_color=TEXT_GRAY, wraplength=500, justify="left",
+            ).pack(anchor="w")
+            habitos = ctk.CTkTextbox(scroll, height=90, font=ComponenteUI.fuente(15))
+            habitos.insert("1.0", str(datos.get("descripcion_habitos") or ""))
+            habitos.pack(fill="x", pady=(3, 4))
+            entradas["descripcion_habitos"] = habitos
+        elif datos["rol"] == "Cuidador":
+            campo("Cédula profesional", "cedula_medica")
+
+        def guardar_cambios() -> None:
+            campos = {
+                clave: entrada.get("1.0", "end-1c").strip() if isinstance(entrada, ctk.CTkTextbox) else entrada.get().strip()
+                for clave, entrada in entradas.items()
+            }
+            if not campos.get("nombre") or not campos.get("correo"):
+                NotificationService.mostrar(ventana, MensajeMITA.CAMPOS_OBLIGATORIOS.value, es_error=True)
+                return
+            if datos["rol"] == "Adulto Mayor":
+                try:
+                    campos["imc"] = float(campos["imc"] or 22)
+                except ValueError:
+                    NotificationService.mostrar(ventana, "El IMC debe ser un número válido.", es_error=True)
+                    return
+            resultado = self.cuenta_service.actualizar(actor, user_id, campos)
+            NotificationService.mostrar(ventana, resultado, es_error=resultado != MensajeMITA.USUARIO_ACTUALIZADO.value)
+            if resultado != MensajeMITA.USUARIO_ACTUALIZADO.value:
+                return
+            if actor.id == user_id:
+                actual = self.user_repo.obtener_por_id(user_id)
+                if actual:
+                    usuario_actualizado = self.user_repo.dict_a_usuario(actual)
+                    SessionManager().usuario_actual = usuario_actualizado
+                    if self.preferencias_usuario.get("mantener_sesion", True):
+                        SessionManager().guardar_sesion_persistente(usuario_actualizado)
+            ventana.after(700, ventana.destroy)
+
+        ComponenteUI.boton(ventana, "Guardar cambios", guardar_cambios, ancho=300).pack(pady=(0, 18))
+
+    def mostrar_confirmacion_eliminar_cuenta(self) -> None:
+        usuario = SessionManager().usuario_actual
+        if not usuario or not usuario.id:
+            return
+        ventana = ctk.CTkToplevel(self)
+        ventana.title("Eliminar toda mi información")
+        ventana.geometry("520x350")
+        ventana.transient(self)
+        ventana.grab_set()
+        ventana.configure(fg_color=BG_COLOR)
+        ComponenteUI.titulo(ventana, "Eliminar mi cuenta", 24).pack(pady=(20, 8))
+        ctk.CTkLabel(
+            ventana,
+            text="Se eliminarán tu perfil, preferencias, progreso, publicaciones y telemetría asociada. No se puede deshacer.",
+            font=ComponenteUI.fuente(14), text_color=TEXT_GRAY, wraplength=440, justify="left",
+        ).pack(padx=30, pady=(0, 12))
+        confirmar = ComponenteUI.entrada(ventana, "Escribe ELIMINAR", ancho=380)
+        confirmar.pack(pady=5)
+        password = ComponenteUI.entrada(ventana, "Tu contraseña actual", ancho=380, password=True)
+        password.pack(pady=5)
+
+        def eliminar() -> None:
+            fila = self.user_repo.obtener_por_id(usuario.id)
+            valido = fila and GestorSeguridad.verificar_password(password.get(), fila["password_hash"])
+            if confirmar.get().strip().upper() != "ELIMINAR" or not valido:
+                NotificationService.mostrar(ventana, "Confirma ELIMINAR y escribe tu contraseña actual.", es_error=True)
+                return
+            resultado = self.cuenta_service.eliminar_cuenta_propia(usuario)
+            if resultado != MensajeMITA.USUARIO_ELIMINADO.value:
+                NotificationService.mostrar(ventana, resultado, es_error=True)
+                return
+            self._detener_chat()
+            SessionManager().cerrar_sesion(borrar_persistida=True)
+            for hijo in self.winfo_children():
+                if isinstance(hijo, ctk.CTkToplevel) and hijo is not ventana:
+                    hijo.destroy()
+            ventana.destroy()
+            self.mostrar_bienvenida("Tu información personal fue eliminada correctamente.")
+
+        ComponenteUI.boton(ventana, "Eliminar permanentemente", eliminar, ancho=320, color=ERROR_COLOR).pack(pady=16)
+
+    def mostrar_mensajes(self) -> None:
+        """Abre el chat general compartido por los cuatro tipos de cuenta."""
+        usuario = SessionManager().usuario_actual
+        if not usuario or not usuario.id:
+            return
+        if self._ventana_chat and self._ventana_chat.winfo_exists():
+            self._ventana_chat.lift()
+            return
+        ventana = ctk.CTkToplevel(self)
+        self._ventana_chat = ventana
+        ventana.title("Mensajes MITA")
+        ventana.geometry("620x560")
+        ventana.configure(fg_color=BG_COLOR)
+        def cerrar_chat() -> None:
+            self._detener_chat()
+            ventana.destroy()
+            self._ventana_chat = None
+        ventana.protocol("WM_DELETE_WINDOW", cerrar_chat)
+        ComponenteUI.titulo(ventana, "Mensajes MITA", 24).pack(pady=(16, 4))
+        estado = ctk.CTkLabel(ventana, text="Conectando…", font=ComponenteUI.fuente(13), text_color=TEXT_GRAY)
+        estado.pack()
+        ctk.CTkLabel(
+            ventana, text="No compartas contraseñas, diagnósticos ni otra información clínica o sensible.",
+            font=ComponenteUI.fuente(13), text_color=ERROR_COLOR, wraplength=540,
+        ).pack(padx=20, pady=(4, 8))
+        historial = ctk.CTkTextbox(ventana, height=330, font=ComponenteUI.fuente(15), state="disabled")
+        historial.pack(fill="both", expand=True, padx=20, pady=6)
+        entrada = ComponenteUI.entrada(ventana, "Escribe un mensaje general…", ancho=430)
+        entrada.pack(side="left", padx=(20, 8), pady=14)
+
+        def agregar(nombre: str, texto: str) -> None:
+            if not ventana.winfo_exists():
+                return
+            historial.configure(state="normal")
+            historial.insert("end", f"{nombre}: {texto}\n")
+            historial.see("end")
+            historial.configure(state="disabled")
+
+        for nombre, texto in self._historial_chat[-100:]:
+            agregar(nombre, texto)
+
+        def recibir(nombre: str, texto: str) -> None:
+            self._historial_chat.append((nombre, texto))
+            self.after(0, lambda: agregar(nombre, texto))
+
+        def conectar() -> None:
+            try:
+                self.chat_cliente = ClienteChatMITA(usuario.nombre, recibir)
+                conectado = self.chat_cliente.iniciar()
+                texto_estado = "Chat conectado." if conectado else self.chat_cliente.estado().descripcion
+            except Exception:
+                texto_estado = "No fue posible iniciar el chat seguro."
+                self.chat_cliente = None
+            self.after(0, lambda: estado.configure(text=texto_estado))
+
+        import threading
+        threading.Thread(target=conectar, daemon=True).start()
+
+        def enviar() -> None:
+            texto = entrada.get().strip()
+            if not texto:
+                return
+            if not self.chat_cliente or not self.chat_cliente.enviar(texto):
+                NotificationService.mostrar(ventana, "El chat aún no está conectado o no tiene un broker seguro configurado.", es_error=True)
+                return
+            entrada.delete(0, "end")
+
+        ComponenteUI.boton(ventana, "Enviar", enviar, ancho=140).pack(side="right", padx=(8, 20), pady=14)
+        entrada.bind("<Return>", lambda _evento: enviar())
+
+    def _detener_chat(self) -> None:
+        if self.chat_cliente:
+            self.chat_cliente.detener()
+        self.chat_cliente = None
+        self._historial_chat = []
+
+    def mostrar_asistente_ia(self) -> None:
+        """Asistente general, disponible para cada tipo de cuenta autenticada."""
+        if not SessionManager().usuario_actual:
+            return
+        if self._ventana_ia and self._ventana_ia.winfo_exists():
+            self._ventana_ia.lift()
+            return
+        if not self.ia_service.conectado:
+            NotificationService.mostrar(self.main_container, self.ia_service.estado, es_error=True)
+            return
+
+        ventana = ctk.CTkToplevel(self)
+        self._ventana_ia = ventana
+        ventana.title("Asistente IA MITA")
+        ventana.geometry("640x590")
+        ventana.configure(fg_color=BG_COLOR)
+
+        def cerrar_ventana() -> None:
+            ventana.destroy()
+            self._ventana_ia = None
+
+        ventana.protocol("WM_DELETE_WINDOW", cerrar_ventana)
+        ComponenteUI.titulo(ventana, "Asistente IA", 24).pack(pady=(16, 4))
+        ctk.CTkLabel(
+            ventana, text=self.ia_service.estado, font=ComponenteUI.fuente(13), text_color=TEXT_GRAY,
+        ).pack()
+        ctk.CTkLabel(
+            ventana,
+            text="Haz preguntas generales sobre MITA y bienestar. No escribas diagnósticos, medicamentos, datos clínicos ni contraseñas.",
+            font=ComponenteUI.fuente(13), text_color=ERROR_COLOR, wraplength=560, justify="left",
+        ).pack(padx=20, pady=(5, 8))
+        historial = ctk.CTkTextbox(ventana, height=350, font=ComponenteUI.fuente(15), state="disabled")
+        historial.pack(fill="both", expand=True, padx=20, pady=6)
+        entrada = ComponenteUI.entrada(ventana, "Escribe una pregunta general…", ancho=420)
+        entrada.pack(side="left", padx=(20, 8), pady=14)
+
+        def agregar(autor: str, texto: str) -> None:
+            if not ventana.winfo_exists():
+                return
+            historial.configure(state="normal")
+            historial.insert("end", f"{autor}: {texto}\n\n")
+            historial.see("end")
+            historial.configure(state="disabled")
+
+        def enviar() -> None:
+            texto = entrada.get().strip()
+            if not texto:
+                return
+            entrada.delete(0, "end")
+            boton_enviar.configure(state="disabled")
+            agregar("Tú", texto)
+
+            def consultar() -> None:
+                respuesta = self.ia_service.enviar_mensaje(texto)
+
+                def mostrar_respuesta() -> None:
+                    agregar("MITA IA", respuesta)
+                    if ventana.winfo_exists():
+                        boton_enviar.configure(state="normal")
+
+                self.after(0, mostrar_respuesta)
+
+            threading.Thread(target=consultar, daemon=True).start()
+
+        boton_enviar = ComponenteUI.boton(ventana, "Enviar", enviar, ancho=140)
+        boton_enviar.pack(side="right", padx=(8, 20), pady=14)
+        entrada.bind("<Return>", lambda _evento: enviar())
+        ComponenteUI.boton(
+            ventana, "Limpiar chat", lambda: (self.ia_service.reiniciar_conversacion(), historial.configure(state="normal"), historial.delete("1.0", "end"), historial.configure(state="disabled")),
+            ancho=180, color=TEXT_GRAY,
+        ).pack(pady=(0, 12))
 
     def cambiar_idioma(self, etiqueta: str) -> None:
         codigo = next((key for key, value in IDIOMAS.items() if value == etiqueta), "es")
         establecer_idioma(codigo)
+        usuario = SessionManager().usuario_actual
+        if usuario and usuario.id:
+            self.preferencias_usuario = self.personalization_service.guardar(usuario.id, {"idioma": codigo})
         self._actualizar_textos_barra()
-        self.aplicar_idioma_actual()
+        self._refrescar_vista_actual()
+        self.after_idle(self.aplicar_idioma_actual)
 
     def _actualizar_textos_barra(self) -> None:
         self._texto_accesibilidad.configure(text=traducir("Accesibilidad"))
@@ -308,7 +684,26 @@ class MitaApp(ctk.CTk):
             for hijo in widget.winfo_children():
                 recorrer(hijo)
 
-        recorrer(self.main_container)
+        recorrer(self)
+
+    def _refrescar_vista_actual(self) -> None:
+        """Redibuja el panel para aplicar tema e idioma a todos los controles."""
+        usuario = SessionManager().usuario_actual
+        if not usuario:
+            self.mostrar_bienvenida()
+            return
+        if self.actividad_actual is not None and usuario.panel_destino() == "adulto":
+            self.vista_adulto.instrucciones(self.actividad_actual)
+            return
+        destino = usuario.panel_destino()
+        if destino == "adulto":
+            self.vista_adulto.dashboard()
+        elif destino == "familiar":
+            self.vista_familiar.dashboard()
+        elif destino == "cuidador":
+            self.vista_cuidador.dashboard()
+        elif destino == "admin":
+            self.vista_admin.dashboard()
 
     def _abrir_admin_secreto(self, _event=None) -> None:
         self.limpiar_pantalla()
@@ -573,7 +968,7 @@ class MitaApp(ctk.CTk):
 
     def _cargar_progreso_usuario(self, usuario) -> None:
         if usuario and usuario.id:
-            datos = self.progreso_repo.obtener_progreso(usuario.id)
+            datos = self.progreso_repo.obtener_progreso_vista(usuario.id)
             self.gestor_progreso = GestorProgreso()
             self.gestor_progreso.cargar_desde_db(datos)
 
@@ -593,6 +988,8 @@ class MitaApp(ctk.CTk):
 
     def cerrar_sesion(self) -> None:
         usuario = SessionManager().usuario_actual
+        self._detener_chat()
+        self.ia_service.reiniciar_conversacion()
         duracion = self.time_tracking_service.finalizar_sesion()
         self.analytics_service.registrar_logout(
             usuario.id if usuario else None, self.mongo_session_id, duracion
@@ -605,6 +1002,7 @@ class MitaApp(ctk.CTk):
 
     def _cerrar_ventana(self) -> None:
         """Registra la duración sin cerrar la sesión persistente al apagar."""
+        self._detener_chat()
         usuario = SessionManager().usuario_actual
         duracion = self.time_tracking_service.finalizar_sesion()
         if usuario and usuario.id:
@@ -648,8 +1046,7 @@ class MitaApp(ctk.CTk):
                 "correo": d.get("correo", ""),
                 "password": d.get("contraseña", ""),
                 "rol": "Adulto Mayor",
-                "limitaciones_movilidad": d.get("limitaciones", "Ninguna"),
-                "nivel_movilidad": d.get("movilidad", "Normal"),
+                "descripcion_movilidad": d.get("movilidad", "Ninguna"),
                 "acepto_privacidad": 1,
             })
             if res == MensajeMITA.REGISTRO_EXITOSO.value:
@@ -664,8 +1061,7 @@ class MitaApp(ctk.CTk):
                 ("", "nombre", False),
                 ("", "correo", False),
                 ("", "contraseña", True),
-                ("Limitaciones (ej. rodilla, ninguna)", "limitaciones", False),
-                ("Nivel movilidad (Normal/Reducida)", "movilidad", False),
+                ("Descripción movilidad (Ej. rodilla, ninguna)", "movilidad", False),
             ],
             guardar,
             "Adulto Mayor",
@@ -695,7 +1091,7 @@ class MitaApp(ctk.CTk):
             res = self.auth_service.registrar_usuario({
                 "nombre": d["nombre"], "correo": d["correo"],
                 "password": d["contraseña"], "rol": "Cuidador",
-                "cedula_medica": d.get("cedula", "MED-0000"),
+                "tipo_cuidador": d.get("tipo", "General"),
             })
             if res == MensajeMITA.REGISTRO_EXITOSO.value:
                 self.mostrar_login_rol("Cuidador")
@@ -708,6 +1104,7 @@ class MitaApp(ctk.CTk):
             [
                 ("", "nombre", False), ("", "correo", False),
                 ("", "contraseña", True), ("Cédula profesional", "cedula", False),
+                ("Tipo (Médico, Enfermero...)", "tipo", False),
             ],
             guardar,
             "Cuidador",
@@ -720,10 +1117,7 @@ class MitaApp(ctk.CTk):
             res = self.auth_service.registrar_usuario({
                 "nombre": d["nombre"], "correo": d["correo"],
                 "password": d["contraseña"], "rol": "Adulto Mayor",
-                "limitaciones_movilidad": d.get("limitaciones", "Ninguna"),
-                "alergias": d.get("alergias", "Ninguna"),
-                "imc": float(d.get("imc") or 22),
-                "nivel_movilidad": d.get("movilidad", "Normal"),
+                "descripcion_movilidad": d.get("movilidad", "Ninguna"),
                 "dificultades_cognitivas": d.get("cognitivas", "Ninguna"),
                 "perfil_medico": d.get("perfil_medico", ""),
                 "creado_por": medico.id if medico else None,
@@ -741,7 +1135,7 @@ class MitaApp(ctk.CTk):
             [
                 ("", "nombre", False), ("", "correo", False), ("Contraseña para el adulto", "contraseña", True),
                 ("Alergias", "alergias", False), ("IMC", "imc", False),
-                ("Movilidad", "movilidad", False), ("Limitaciones", "limitaciones", False),
+                ("Descripción de movilidad", "movilidad", False),
                 ("Dificultades cognitivas", "cognitivas", False), ("Perfil médico", "perfil_medico", False),
             ],
             guardar,
@@ -782,7 +1176,7 @@ class MitaApp(ctk.CTk):
             res = self.auth_service.registrar_usuario({
                 "nombre": d["nombre"], "correo": d["correo"],
                 "password": d["contraseña"], "rol": "Adulto Mayor",
-                "limitaciones_movilidad": d.get("limitaciones", "Ninguna"),
+                "descripcion_movilidad": d.get("movilidad", "Ninguna"),
                 "creado_por": familiar.id if familiar else None,
                 "id_familiar_vincular": familiar.id if familiar else None,
             })
@@ -799,7 +1193,7 @@ class MitaApp(ctk.CTk):
             [
                 ("", "nombre", False), ("", "correo", False),
                 ("Contraseña para el adulto", "contraseña", True),
-                ("Limitaciones", "limitaciones", False),
+                ("Descripción de movilidad", "movilidad", False),
             ],
             guardar,
             "Familiar",

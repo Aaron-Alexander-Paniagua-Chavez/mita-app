@@ -20,6 +20,7 @@ from models.actividad import Actividad, AdaptadorEjercicios
 from models.progreso import GestorProgreso, PanelCuidador, ReporteCuidador, SistemaLogros
 from models.usuario import AdultoMayor
 from ui.components import ComponenteUI, GuiaVisual, LogoMITA, NotificationService
+from ui.i18n import traducir
 from services.activity_filter_service import ActivityFilterService
 
 
@@ -115,6 +116,18 @@ class VistaAdultoMayor(VistaMixin):
             ancho=200, color="#8975B4",
         ).pack(anchor="w", padx=20)
 
+        acciones = ctk.CTkFrame(self.app.main_container, fg_color="transparent")
+        acciones.pack(fill="x", padx=36, pady=6)
+        ComponenteUI.boton(
+            acciones, "✉ Mensajes", self.app.mostrar_mensajes, ancho=220,
+        ).pack(side="left", padx=(0, 8))
+        ComponenteUI.boton(
+            acciones, "Editar mis datos", lambda: self.app.mostrar_edicion_usuario(usuario.id), ancho=220,
+        ).pack(side="left")
+        ComponenteUI.boton(
+            acciones, "✨ Asistente IA", self.app.mostrar_asistente_ia, ancho=220,
+        ).pack(side="left", padx=(8, 0))
+
         # Accesibilidad rápida
         acc_frame = ctk.CTkFrame(self.app.main_container, fg_color=SURFACE_COLOR, corner_radius=12)
         acc_frame.pack(fill="x", padx=36, pady=8)
@@ -148,23 +161,21 @@ class VistaAdultoMayor(VistaMixin):
         LogoMITA(frame, size=48).pack(anchor="w")
 
         usuario = SessionManager().usuario_actual
-        limitaciones = "Ninguna"
-        movilidad = "Normal"
+        descripcion_movilidad = "Ninguna"
         dificultades = "Ninguna"
         actividades_excluidas = []
 
         if isinstance(usuario, AdultoMayor):
-            limitaciones = usuario.limitaciones_movilidad
-            movilidad = usuario.nivel_movilidad
-            dificultades = usuario.dificultades_cognitivas
+            descripcion_movilidad = getattr(usuario, "descripcion_movilidad", "Ninguna")
+            dificultades = getattr(usuario, "dificultades_cognitivas", "Ninguna")
             # Obtener preferencias personalizadas del usuario
             prefs = self.app.activity_filter_service.obtener_limitaciones_usuario(usuario.id or 0)
-            limitaciones = prefs.get("limitaciones_movilidad", limitaciones)
+            descripcion_movilidad = prefs.get("descripcion_movilidad", descripcion_movilidad)
             dificultades = prefs.get("dificultades_cognitivas", dificultades)
             actividades_excluidas = prefs.get("actividades_excluidas", [])
 
         # Filtrar actividades físicas según preferencias del usuario
-        actividades_fisicas_raw, msj_fisico = AdaptadorEjercicios.filtrar_fisicos(limitaciones, movilidad)
+        actividades_fisicas_raw, msj_fisico = AdaptadorEjercicios.filtrar_fisicos(descripcion_movilidad)
         actividades_fisicas = self.app.activity_filter_service.filtrar_actividades(
             actividades_fisicas_raw, usuario.id or 0
         )
@@ -177,7 +188,7 @@ class VistaAdultoMayor(VistaMixin):
             card = ctk.CTkFrame(scroll, fg_color=SURFACE_COLOR, corner_radius=10)
             card.pack(fill="x", pady=6)
             ctk.CTkLabel(
-                card, text=f"◉ {ej.titulo} · {ej.duracion_sugerida_min} min · {ej.impacto}",
+                card, text=f"◉ {traducir(ej.titulo)} · {ej.duracion_sugerida_min} {traducir('min')} · {traducir(ej.impacto)}",
                 font=ComponenteUI.fuente(18), text_color=DARK_TEXT,
             ).pack(side="left", padx=16, pady=14)
             ComponenteUI.boton(
@@ -215,7 +226,7 @@ class VistaAdultoMayor(VistaMixin):
             card = ctk.CTkFrame(scroll, fg_color=SURFACE_COLOR, corner_radius=10)
             card.pack(fill="x", pady=6)
             ctk.CTkLabel(
-                card, text=f"◈ {ej.titulo} · {ej.duracion_sugerida_min} min",
+                card, text=f"◈ {traducir(ej.titulo)} · {ej.duracion_sugerida_min} {traducir('min')}",
                 font=ComponenteUI.fuente(18), text_color=DARK_TEXT,
             ).pack(side="left", padx=16, pady=14)
             ComponenteUI.boton(
@@ -246,7 +257,7 @@ class VistaAdultoMayor(VistaMixin):
             else:
                 ctk.CTkLabel(row, text=paso.icono, font=ComponenteUI.fuente(28)).pack(side="left", padx=(0, 12))
             ctk.CTkLabel(
-                row, text=f"{paso.orden}. {paso.texto}",
+                row, text=f"{paso.orden}. {traducir(paso.texto)}",
                 font=ComponenteUI.fuente(18), justify="left", wraplength=620,
             ).pack(side="left", fill="x")
 
@@ -279,7 +290,6 @@ class VistaAdultoMayor(VistaMixin):
             usuario = SessionManager().usuario_actual
             duracion = self.app.time_tracking_service.finalizar_actividad(actividad.titulo)
             if usuario and usuario.id:
-                self.app.progreso_repo.guardar_progreso(usuario.id, self.app.gestor_progreso.to_dict())
                 self.app.progreso_repo.registrar_historial(
                     usuario.id, actividad.categoria, actividad.titulo, actividad.calcular_puntuacion(),
                 )
@@ -432,6 +442,13 @@ class VistaFamiliar(VistaMixin):
             self.app.mostrar_registro_adulto_familiar,
             ancho=360, grande=True,
         ).pack(pady=20)
+        acciones = ctk.CTkFrame(frame, fg_color="transparent")
+        acciones.pack(pady=(0, 16))
+        ComponenteUI.boton(acciones, "✉ Mensajes", self.app.mostrar_mensajes, ancho=180).pack(side="left", padx=6)
+        ComponenteUI.boton(
+            acciones, "Editar mis datos", lambda: self.app.mostrar_edicion_usuario(usuario.id), ancho=180,
+        ).pack(side="left", padx=6)
+        ComponenteUI.boton(acciones, "✨ Asistente IA", self.app.mostrar_asistente_ia, ancho=180).pack(side="left", padx=6)
 
 
 class VistaCuidador(VistaMixin):
@@ -471,15 +488,25 @@ class VistaCuidador(VistaMixin):
 
         btns = ctk.CTkFrame(frame, fg_color="transparent")
         btns.pack(fill="x", pady=8)
-        ComponenteUI.boton(btns, "➕ Registrar adulto mayor", self.app.mostrar_registro_adulto_medico, ancho=280).pack(side="left", padx=4)
-        ComponenteUI.boton(btns, "➕ Registrar familiar", self.app.mostrar_registro_familiar_medico, ancho=220).pack(side="left", padx=4)
+        primera_fila = ctk.CTkFrame(btns, fg_color="transparent")
+        primera_fila.pack(fill="x", pady=2)
+        ComponenteUI.boton(primera_fila, "➕ Registrar adulto mayor", self.app.mostrar_registro_adulto_medico, ancho=280).pack(side="left", padx=4)
+        ComponenteUI.boton(primera_fila, "➕ Registrar familiar", self.app.mostrar_registro_familiar_medico, ancho=220).pack(side="left", padx=4)
+        ComponenteUI.boton(primera_fila, "Gestionar usuarios", self._gestionar_usuarios, ancho=190).pack(side="left", padx=4)
+        segunda_fila = ctk.CTkFrame(btns, fg_color="transparent")
+        segunda_fila.pack(fill="x", pady=2)
+        ComponenteUI.boton(segunda_fila, "✉ Mensajes", self.app.mostrar_mensajes, ancho=180).pack(side="left", padx=4)
+        ComponenteUI.boton(
+            segunda_fila, "Editar mis datos", lambda: self.app.mostrar_edicion_usuario(usuario.id), ancho=180,
+        ).pack(side="left", padx=4)
+        ComponenteUI.boton(segunda_fila, "✨ Asistente IA", self.app.mostrar_asistente_ia, ancho=180).pack(side="left", padx=4)
 
         scroll = ctk.CTkScrollableFrame(frame, fg_color="transparent", height=320)
         scroll.pack(fill="both", expand=True, pady=8)
         reporte = ReporteCuidador()
         for p in pacientes:
             gp = GestorProgreso()
-            gp.cargar_desde_db(self.app.progreso_repo.obtener_progreso(p["id"]))
+            gp.cargar_desde_db(self.app.progreso_repo.obtener_progreso_vista(p["id"]))
             adulto = self.app.user_repo.dict_a_usuario(p)
             card = ctk.CTkFrame(scroll, fg_color=SOFT_GREEN, corner_radius=10)
             card.pack(fill="x", pady=4)
@@ -487,6 +514,37 @@ class VistaCuidador(VistaMixin):
                 card, text=reporte.generar_resumen(adulto, gp),
                 font=ComponenteUI.fuente(15), justify="left",
             ).pack(padx=14, pady=12)
+            ctk.CTkButton(
+                card, text="Editar información", width=160,
+                command=lambda uid=p["id"]: self.app.mostrar_edicion_usuario(uid),
+            ).pack(anchor="e", padx=14, pady=(0, 10))
+
+
+    def _gestionar_usuarios(self) -> None:
+        """El personal médico puede corregir los datos de cualquier usuario."""
+        ventana = ctk.CTkToplevel(self.app)
+        ventana.title("Gestionar información de usuarios")
+        ventana.geometry("680x560")
+        ventana.transient(self.app)
+        ventana.configure(fg_color=BG_COLOR)
+        ComponenteUI.titulo(ventana, "Gestionar usuarios", 24).pack(pady=(16, 8))
+        ctk.CTkLabel(
+            ventana, text="Actualiza datos con autorización de la persona cuando corresponda.",
+            font=ComponenteUI.fuente(13), text_color=TEXT_GRAY,
+        ).pack(pady=(0, 8))
+        scroll = ctk.CTkScrollableFrame(ventana, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=20, pady=8)
+        for persona in self.app.user_repo.listar_todos():
+            fila = ctk.CTkFrame(scroll, fg_color=SURFACE_COLOR, corner_radius=8)
+            fila.pack(fill="x", pady=3)
+            ctk.CTkLabel(
+                fila, text=f"{persona['nombre']} · {persona['correo']} · {persona['rol']}",
+                font=ComponenteUI.fuente(14),
+            ).pack(side="left", padx=12, pady=8)
+            ctk.CTkButton(
+                fila, text="Editar", width=100,
+                command=lambda uid=persona["id"]: self.app.mostrar_edicion_usuario(uid),
+            ).pack(side="right", padx=8, pady=6)
 
 
 class VistaAdmin(VistaMixin):
@@ -512,8 +570,8 @@ class VistaAdmin(VistaMixin):
             texto = f"ID {u['id']} | {u['nombre']} | {u['correo']} | Rol: {u['rol']}"
             ctk.CTkLabel(card, text=texto, font=ComponenteUI.fuente(15)).pack(side="left", padx=12, pady=10)
             ctk.CTkButton(
-                card, text="Editar rol", width=90,
-                command=lambda uid=u["id"]: self._editar_rol(uid),
+                card, text="Editar datos", width=110,
+                command=lambda uid=u["id"]: self.app.mostrar_edicion_usuario(uid),
             ).pack(side="right", padx=8)
             ctk.CTkButton(
                 card, text="Restablecer", width=100,
@@ -521,8 +579,43 @@ class VistaAdmin(VistaMixin):
             ).pack(side="right", padx=8)
 
         ComponenteUI.boton(frame, "Comprobar conexión MySQL", self._sync, ancho=260).pack(pady=8)
-        ComponenteUI.boton(frame, "Probar IA", self._probar_ia, ancho=120).pack(pady=4, side="left", padx=(0, 4))
-        ComponenteUI.boton(frame, "Salir del panel admin", self.app.mostrar_bienvenida, ancho=220, color=TEXT_GRAY).pack(pady=4)
+        ComponenteUI.boton(frame, "Ver información de MongoDB", self._ver_mongo, ancho=260).pack(pady=4)
+        ComponenteUI.boton(frame, "✉ Mensajes", self.app.mostrar_mensajes, ancho=180).pack(pady=4)
+        admin_actual = SessionManager().usuario_actual
+        ComponenteUI.boton(
+            frame, "Editar mis datos", lambda: self.app.mostrar_edicion_usuario(admin_actual.id), ancho=180,
+        ).pack(pady=4)
+        ComponenteUI.boton(frame, "✨ Asistente IA", self.app.mostrar_asistente_ia, ancho=180).pack(pady=4)
+        ComponenteUI.boton(frame, "Cerrar sesión", self.app.cerrar_sesion, ancho=220, color=TEXT_GRAY).pack(pady=4)
+
+    def _ver_mongo(self) -> None:
+        """Muestra al administrador un resumen de telemetría, no credenciales ni IDs."""
+        resumen = self.app.db_service.resumen_mongo()
+        ventana = ctk.CTkToplevel(self.app)
+        ventana.title("Información de MongoDB")
+        ventana.geometry("720x560")
+        ventana.transient(self.app)
+        ventana.configure(fg_color=BG_COLOR)
+        ComponenteUI.titulo(ventana, "MongoDB · telemetría", 24).pack(pady=(16, 4))
+        if not resumen["disponible"]:
+            ctk.CTkLabel(
+                ventana, text="MongoDB no está conectado. La aplicación funciona sin telemetría.",
+                font=ComponenteUI.fuente(15), text_color=TEXT_GRAY,
+            ).pack(padx=24, pady=18)
+            return
+        ctk.CTkLabel(
+            ventana, text="Resumen sin identificadores de usuario ni credenciales.",
+            font=ComponenteUI.fuente(13), text_color=TEXT_GRAY,
+        ).pack(pady=(0, 8))
+        contenido = ctk.CTkTextbox(ventana, font=ComponenteUI.fuente(14))
+        contenido.pack(fill="both", expand=True, padx=20, pady=12)
+        for coleccion in resumen["colecciones"]:
+            contenido.insert("end", f"{coleccion['nombre']} — {coleccion['total']} documentos\n")
+            for ejemplo in coleccion["ejemplos"][:5]:
+                valores = ", ".join(f"{clave}: {valor}" for clave, valor in ejemplo.items())
+                contenido.insert("end", f"  · {valores}\n")
+            contenido.insert("end", "\n")
+        contenido.configure(state="disabled")
 
     def _restablecer_contrasena(self, user_id: int) -> None:
         dialog = ctk.CTkInputDialog(

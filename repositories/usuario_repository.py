@@ -13,11 +13,16 @@ class UsuarioRepository:
 
     _SELECT_USUARIO = """
         SELECT u.id, u.nombre, u.correo, u.password_hash, u.rol, u.fecha_registro,
-               COALESCE(am.limitaciones_movilidad, 'Ninguna') AS limitaciones_movilidad,
+               u.genero, u.telefono, u.ubicacion, u.foto_perfil,
+               am.fecha_nacimiento,
+               COALESCE(am.descripcion_movilidad, '') AS descripcion_movilidad,
                COALESCE(am.perfil_medico, '') AS perfil_medico,
+               COALESCE(am.descripcion_habitos, '') AS descripcion_habitos,
                COALESCE(am.imc, 22.0) AS imc,
-               COALESCE(am.nivel_movilidad, 'Normal') AS nivel_movilidad,
                COALESCE(c.cedula_medica, '') AS cedula_medica,
+               COALESCE(tc.nombre, '') AS tipo_cuidador,
+               COALESCE(c.id_tipo_cuidador, 1) AS id_tipo_cuidador,
+               COALESCE(c.especialidad, '') AS especialidad,
                COALESCE((
                    SELECT GROUP_CONCAT(a.nombre ORDER BY a.nombre SEPARATOR ', ')
                    FROM adulto_alergia aa
@@ -30,12 +35,26 @@ class UsuarioRepository:
                    JOIN dificultad_cognitiva dc ON dc.id = ad.id_dificultad
                    WHERE ad.id_adulto = am.id
                ), 'Ninguna') AS dificultades_cognitivas,
+               COALESCE((
+                   SELECT GROUP_CONCAT(ant.nombre ORDER BY ant.nombre SEPARATOR ', ')
+                   FROM adulto_antecedente aa
+                   JOIN antecedente_medico ant ON ant.id = aa.id_antecedente
+                   WHERE aa.id_adulto = am.id
+               ), 'Ninguno') AS antecedentes_medicos,
+               COALESCE((
+                   SELECT ce.nombre FROM contacto_emergencia ce WHERE ce.id_adulto = am.id LIMIT 1
+               ), '') AS contacto_emergencia_nombre,
+               COALESCE((
+                   SELECT ce.telefono FROM contacto_emergencia ce WHERE ce.id_adulto = am.id LIMIT 1
+               ), '') AS contacto_emergencia_telefono,
                (SELECT rf.id_adulto FROM relaciones_familiar rf
-                   WHERE rf.id_familiar = u.id AND rf.autorizado = 1
-                   ORDER BY rf.fecha_vinculo DESC LIMIT 1) AS id_adulto_vinculado
+                JOIN familiar f ON rf.id_familiar = f.id
+                WHERE f.id_usuario = u.id AND rf.autorizado = 1
+                ORDER BY rf.fecha_vinculo DESC LIMIT 1) AS id_adulto_vinculado
         FROM usuarios u
         LEFT JOIN adulto_mayor am ON am.id_usuario = u.id
         LEFT JOIN cuidador c ON c.id_usuario = u.id
+        LEFT JOIN tipo_cuidador tc ON c.id_tipo_cuidador = tc.id_tipo_cuidador
     """
 
     def __init__(self, db: DatabaseManager) -> None:
@@ -55,22 +74,23 @@ class UsuarioRepository:
             cursor = conn.cursor()
             conn.start_transaction()
             cursor.execute(
-                """INSERT INTO usuarios (nombre, correo, password_hash, rol)
-                   VALUES (%s, %s, %s, %s)""",
-                (usuario.nombre, usuario.correo, usuario.password_hash, usuario.rol),
+                """INSERT INTO usuarios (nombre, correo, password_hash, rol, genero, telefono, ubicacion, foto_perfil)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (usuario.nombre, usuario.correo, usuario.password_hash, usuario.rol, getattr(usuario, "genero", None), getattr(usuario, "telefono", None), getattr(usuario, "ubicacion", None), getattr(usuario, "foto_perfil", None)),
             )
             usuario.id = cursor.lastrowid
             if usuario.rol == "Adulto Mayor":
                 cursor.execute(
                     """INSERT INTO adulto_mayor
-                       (id_usuario, limitaciones_movilidad, perfil_medico, imc, nivel_movilidad)
-                       VALUES (%s, %s, %s, %s, %s)""",
+                       (id_usuario, fecha_nacimiento, descripcion_movilidad, perfil_medico, descripcion_habitos, imc)
+                       VALUES (%s, %s, %s, %s, %s, %s)""",
                     (
                         usuario.id,
-                        datos_extra.get("limitaciones_movilidad") or "Ninguna",
+                        datos_extra.get("fecha_nacimiento") or None,
+                        datos_extra.get("descripcion_movilidad") or "",
                         datos_extra.get("perfil_medico") or "",
+                        datos_extra.get("descripcion_habitos") or "",
                         datos_extra.get("imc") or 22.0,
-                        datos_extra.get("nivel_movilidad") or "Normal",
                     ),
                 )
                 adulto_id = cursor.lastrowid
@@ -81,12 +101,38 @@ class UsuarioRepository:
                     cursor, adulto_id, "dificultad_cognitiva", datos_extra.get("dificultades_cognitivas"),
                     "adulto_dificultad", "id_dificultad",
                 )
-            elif usuario.rol == "Cuidador":
-                cursor.execute(
-                    "INSERT INTO cuidador (id_usuario, cedula_medica) VALUES (%s, %s)",
-                    (usuario.id, datos_extra.get("cedula_medica") or None),
+                self._guardar_relaciones_salud(
+                    cursor, adulto_id, "antecedente_medico", datos_extra.get("antecedentes_medicos"),
+                    "adulto_antecedente", "id_antecedente",
                 )
-            cursor.execute("INSERT INTO progreso (id_usuario) VALUES (%s)", (usuario.id,))
+                # Contacto de emergencia opcional
+                contacto_nombre = datos_extra.get("contacto_emergencia_nombre") or datos_extra.get("contacto_emergencia")
+                contacto_telefono = datos_extra.get("contacto_emergencia_telefono") or ""
+                if contacto_nombre:
+                    cursor.execute(
+                        "INSERT INTO contacto_emergencia (id_adulto, nombre, telefono, relacion) VALUES (%s, %s, %s, %s)",
+                        (adulto_id, contacto_nombre, contacto_telefono, datos_extra.get("contacto_relacion", "Familiar")),
+                    )
+            elif usuario.rol in ("Cuidador", "Médico"):
+                id_tipo = datos_extra.get("id_tipo_cuidador") or 1
+                cursor.execute(
+                    "INSERT INTO cuidador (id_usuario, cedula_medica, especialidad, id_tipo_cuidador) VALUES (%s, %s, %s, %s)",
+                    (usuario.id, datos_extra.get("cedula_medica") or None, datos_extra.get("especialidad") or None, id_tipo),
+                )
+            elif usuario.rol == "Familiar":
+                cursor.execute("INSERT INTO familiar (id_usuario) VALUES (%s)", (usuario.id,))
+                familiar_id = cursor.lastrowid
+                id_adulto_user = datos_extra.get("id_adulto_vinculado")
+                if id_adulto_user:
+                    cursor.execute("SELECT id FROM adulto_mayor WHERE id_usuario = %s", (id_adulto_user,))
+                    row = cursor.fetchone()
+                    if row:
+                        adulto_id = row[0]
+                        tipo_relacion = datos_extra.get("tipo_relacion", "Familiar")
+                        cursor.execute(
+                            "INSERT INTO relaciones_familiar (id_familiar, id_adulto, tipo_relacion, autorizado) VALUES (%s, %s, %s, 1)",
+                            (familiar_id, adulto_id, tipo_relacion)
+                        )
             conn.commit()
             cursor.close()
             conn.close()
@@ -145,12 +191,16 @@ class UsuarioRepository:
     def actualizar_usuario(self, user_id: int, campos: dict) -> bool:
         if not campos:
             return False
-        permitidos_usuario = {"nombre", "correo", "rol", "password_hash"}
-        permitidos_adulto = {"limitaciones_movilidad", "perfil_medico", "imc", "nivel_movilidad"}
+        permitidos_usuario = {"nombre", "correo", "rol", "password_hash", "genero", "telefono", "ubicacion", "foto_perfil"}
+        permitidos_adulto = {
+            "fecha_nacimiento", "descripcion_movilidad", "perfil_medico", "descripcion_habitos", "imc"
+        }
+        permitidos_cuidador = {"cedula_medica", "especialidad", "id_tipo_cuidador"}
+        
         user_fields = {k: v for k, v in campos.items() if k in permitidos_usuario}
         adult_fields = {k: v for k, v in campos.items() if k in permitidos_adulto}
-        if not user_fields and not adult_fields:
-            return False
+        cuidador_fields = {k: v for k, v in campos.items() if k in permitidos_cuidador}
+        
         conn = self._db.obtener_conexion_mysql()
         if not conn:
             return False
@@ -166,6 +216,34 @@ class UsuarioRepository:
                     f"UPDATE adulto_mayor SET {sets} WHERE id_usuario = %s",
                     (*adult_fields.values(), user_id),
                 )
+            if cuidador_fields:
+                sets = ", ".join(f"{field} = %s" for field in cuidador_fields)
+                cursor.execute(
+                    f"UPDATE cuidador SET {sets} WHERE id_usuario = %s",
+                    (*cuidador_fields.values(), user_id),
+                )
+            if "alergias" in campos or "dificultades_cognitivas" in campos or "antecedentes_medicos" in campos:
+                cursor.execute("SELECT id FROM adulto_mayor WHERE id_usuario = %s", (user_id,))
+                adulto = cursor.fetchone()
+                if adulto:
+                    adulto_id = adulto[0]
+                    if "alergias" in campos:
+                        cursor.execute("DELETE FROM adulto_alergia WHERE id_adulto = %s", (adulto_id,))
+                        self._guardar_relaciones_salud(
+                            cursor, adulto_id, "alergia", campos["alergias"], "adulto_alergia", "id_alergia"
+                        )
+                    if "dificultades_cognitivas" in campos:
+                        cursor.execute("DELETE FROM adulto_dificultad WHERE id_adulto = %s", (adulto_id,))
+                        self._guardar_relaciones_salud(
+                            cursor, adulto_id, "dificultad_cognitiva", campos["dificultades_cognitivas"],
+                            "adulto_dificultad", "id_dificultad"
+                        )
+                    if "antecedentes_medicos" in campos:
+                        cursor.execute("DELETE FROM adulto_antecedente WHERE id_adulto = %s", (adulto_id,))
+                        self._guardar_relaciones_salud(
+                            cursor, adulto_id, "antecedente_medico", campos["antecedentes_medicos"],
+                            "adulto_antecedente", "id_antecedente"
+                        )
             conn.commit()
             cursor.close()
             conn.close()
@@ -178,19 +256,43 @@ class UsuarioRepository:
     def eliminar_usuario(self, user_id: int) -> bool:
         return self._db.ejecutar_mysql("DELETE FROM usuarios WHERE id = %s", (user_id,)) is not None
 
-    def vincular_familiar(self, id_familiar: int, id_adulto: int) -> bool:
-        result = self._db.ejecutar_mysql(
-            """INSERT INTO relaciones_familiar (id_familiar, id_adulto, autorizado)
-               VALUES (%s, %s, 1) ON DUPLICATE KEY UPDATE autorizado = 1""",
-            (id_familiar, id_adulto),
-        )
-        return result is not None
+    def vincular_familiar(self, id_familiar_user: int, id_adulto_user: int, tipo_relacion: str = "Familiar") -> bool:
+        conn = self._db.obtener_conexion_mysql()
+        if not conn:
+            return False
+        try:
+            cursor = conn.cursor()
+            conn.start_transaction()
+            cursor.execute("INSERT IGNORE INTO familiar (id_usuario) VALUES (%s)", (id_familiar_user,))
+            cursor.execute("SELECT id FROM familiar WHERE id_usuario = %s", (id_familiar_user,))
+            fam_row = cursor.fetchone()
+            cursor.execute("SELECT id FROM adulto_mayor WHERE id_usuario = %s", (id_adulto_user,))
+            ad_row = cursor.fetchone()
+            if fam_row and ad_row:
+                cursor.execute(
+                    """INSERT INTO relaciones_familiar (id_familiar, id_adulto, tipo_relacion, autorizado)
+                       VALUES (%s, %s, %s, 1) ON DUPLICATE KEY UPDATE autorizado = 1""",
+                    (fam_row[0], ad_row[0], tipo_relacion),
+                )
+                conn.commit()
+                cursor.close()
+                conn.close()
+                return True
+            conn.rollback()
+            conn.close()
+            return False
+        except Exception:
+            conn.rollback()
+            conn.close()
+            return False
 
-    def familiar_autorizado(self, id_familiar: int, id_adulto: int) -> bool:
+    def familiar_autorizado(self, id_familiar_user: int, id_adulto_user: int) -> bool:
         rows = self._db.ejecutar_mysql(
-            """SELECT id FROM relaciones_familiar
-               WHERE id_familiar = %s AND id_adulto = %s AND autorizado = 1""",
-            (id_familiar, id_adulto),
+            """SELECT rf.id FROM relaciones_familiar rf
+               JOIN familiar f ON rf.id_familiar = f.id
+               JOIN adulto_mayor am ON rf.id_adulto = am.id
+               WHERE f.id_usuario = %s AND am.id_usuario = %s AND rf.autorizado = 1""",
+            (id_familiar_user, id_adulto_user),
         )
         return bool(rows)
 

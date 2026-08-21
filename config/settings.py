@@ -138,11 +138,13 @@ MONGO_DATABASE = _valor_configuracion("MONGO_DATABASE", "mita_analytics")
 # Funciones remotas opcionales. Nunca se escriben claves en el código ni se
 # mandan datos clínicos a estas integraciones.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
 MQTT_HOST = os.getenv("MQTT_HOST", "").strip()
 MQTT_PORT = _int_env("MQTT_PORT", 8883)
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "").strip()
 MQTT_TLS = os.getenv("MQTT_TLS", "1").strip().lower() not in {"0", "false", "no"}
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "").strip()
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
 MITA_DEMO_PASSWORD = os.getenv("MITA_DEMO_PASSWORD", "")
 
 MYSQL_CONFIG = {

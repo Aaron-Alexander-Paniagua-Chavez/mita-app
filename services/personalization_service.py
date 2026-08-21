@@ -1,4 +1,18 @@
-"""Preferencias, intereses y sugerencias de motivación de MITA."""
+"""Preferencias, intereses y sugerencias de motivación de MITA.
+
+Diseño de preferencias:
+    La tabla ``preferencias_usuario`` almacena **una sola columna JSON**
+    (``preferencias``). No existen columnas adicionales ni tablas secundarias
+    para tema, idioma, accesibilidad o tamaño de fuente. Se mantiene este
+    diseño porque el JSON permite añadir o eliminar claves sin migraciones de
+    esquema, adaptándose fácilmente a nuevas preferencias futuras.
+
+    Flujo:
+        ``preferencias_usuario.preferencias`` (JSON)
+        → ``PreferenciasRepository.obtener / guardar``
+        → ``PersonalizationService``
+        → UI (app.py / role_views.py)
+"""
 from __future__ import annotations
 
 from typing import Any
@@ -15,7 +29,8 @@ DEFAULT_PREFERENCIAS: dict[str, Any] = {
     "mantener_sesion": True,
     "font_scale": 1.0,
     "modo_oscuro": False,
-    "limitaciones_movilidad": "",
+    "idioma": "es",
+    "descripcion_movilidad": "",
     "dificultades_cognitivas": "",
 }
 
